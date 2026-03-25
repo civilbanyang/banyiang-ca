@@ -1,10 +1,10 @@
 const CACHE = 'surveycam-v3';
 const ASSETS = [
-  '/surveycam/',
-  '/surveycam/index.html',
-  '/surveycam/manifest.json',
-  '/surveycam/icon-192.png',
-  '/surveycam/icon-512.png'
+  '/banyiang-ca/',
+  '/banyiang-ca/index.html',
+  '/banyiang-ca/manifest.json',
+  '/banyiang-ca/icon-192.png',
+  '/banyiang-ca/icon-512.png'
 ];
 
 self.addEventListener('install', e => {
