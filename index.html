@@ -1,1 +1,864 @@
 
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SurveyCAM">
+<meta name="theme-color" content="#080c12">
+<title>SurveyCAM v2</title>
+<link rel="manifest" id="manifest-placeholder">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#080c12;
+  --s1:#0e1420;
+  --s2:#141c2e;
+  --s3:#1c2640;
+  --accent:#00e5b0;
+  --accent-dim:rgba(0,229,176,0.15);
+  --accent-glow:rgba(0,229,176,0.3);
+  --blue:#3b82f6;
+  --blue-dim:rgba(59,130,246,0.15);
+  --warn:#f59e0b;
+  --danger:#ef4444;
+  --text:#eef2ff;
+  --muted:#64748b;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.12);
+  --font:'SF Mono','Fira Code','JetBrains Mono','Courier New',monospace;
+  --radius:12px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:100%;overflow:hidden;}
+#app{display:flex;flex-direction:column;height:100dvh;position:relative;overflow:hidden;}
+
+/* ===== PAGES ===== */
+.page{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:10;}
+.page.active{transform:translateX(0);}
+#page-camera{position:relative;transform:none;z-index:1;}
+
+/* ===== CAMERA PAGE ===== */
+#viewfinder{flex:1;position:relative;overflow:hidden;background:#000;}
+#video{width:100%;height:100%;object-fit:cover;display:block;}
+
+/* scan lines aesthetic */
+#viewfinder::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  z-index:2;
+}
+
+/* top hud */
+#hud-top{
+  position:absolute;top:0;left:0;right:0;z-index:5;
+  padding:calc(var(--safe-top) + 10px) 14px 0;
+  background:linear-gradient(rgba(8,12,18,0.8) 0%, transparent 100%);
+  pointer-events:none;
+}
+.hud-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;}
+.app-badge{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;letter-spacing:.2em;color:var(--accent);font-weight:700;
+}
+.app-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.2};}
+#hud-clock{font-size:13px;color:rgba(255,255,255,.9);letter-spacing:.08em;}
+#hud-gps-status{
+  display:flex;align-items:center;gap:5px;
+  font-size:9px;letter-spacing:.1em;padding:3px 8px;border-radius:20px;
+  border:1px solid var(--accent-glow);background:var(--accent-dim);color:var(--accent);
+}
+#hud-gps-status.warn{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.15);color:var(--warn);}
+#hud-gps-status.err{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:var(--danger);}
+
+/* zoom bar */
+#zoom-bar{
+  position:absolute;bottom:0;left:0;right:0;z-index:5;
+  background:linear-gradient(transparent,rgba(8,12,18,.9));
+  pointer-events:none;
+}
+#coords-strip{
+  display:grid;grid-template-columns:1fr 1fr;gap:2px;
+  padding:8px 14px 4px;font-size:10px;
+}
+.coord-item{display:flex;gap:6px;align-items:center;}
+.coord-lbl{color:var(--accent);font-size:8px;letter-spacing:.15em;min-width:24px;}
+.coord-val{color:rgba(255,255,255,.9);}
+#date-strip{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:4px 14px 10px;font-size:10px;color:rgba(255,255,255,.6);letter-spacing:.06em;
+}
+
+/* corner reticle */
+.reticle{position:absolute;inset:10%;pointer-events:none;z-index:3;}
+.reticle-corner{position:absolute;width:20px;height:20px;}
+.reticle-corner::before,.reticle-corner::after{content:'';position:absolute;background:var(--accent);opacity:.7;}
+.reticle-corner.tl{top:0;left:0;}
+.reticle-corner.tl::before{width:2px;height:100%;top:0;left:0;}
+.reticle-corner.tl::after{height:2px;width:100%;top:0;left:0;}
+.reticle-corner.tr{top:0;right:0;}
+.reticle-corner.tr::before{width:2px;height:100%;top:0;right:0;}
+.reticle-corner.tr::after{height:2px;width:100%;top:0;right:0;}
+.reticle-corner.bl{bottom:0;left:0;}
+.reticle-corner.bl::before{width:2px;height:100%;bottom:0;left:0;}
+.reticle-corner.bl::after{height:2px;width:100%;bottom:0;left:0;}
+.reticle-corner.br{bottom:0;right:0;}
+.reticle-corner.br::before{width:2px;height:100%;bottom:0;right:0;}
+.reticle-corner.br::after{height:2px;width:100%;bottom:0;right:0;}
+
+/* zoom control */
+#zoom-control{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;z-index:5;
+  pointer-events:all;
+}
+.zoom-btn{
+  width:36px;height:36px;border-radius:50%;
+  border:1px solid var(--border2);background:rgba(8,12,18,.7);
+  color:var(--text);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:all .15s;
+}
+.zoom-btn:active{background:var(--accent-dim);border-color:var(--accent);}
+#zoom-label{
+  font-size:10px;color:var(--accent);letter-spacing:.05em;
+  background:rgba(8,12,18,.7);padding:3px 6px;border-radius:6px;
+  border:1px solid var(--accent-dim);
+}
+
+/* ===== CONTROLS BAR ===== */
+#controls{
+  background:var(--s1);
+  border-top:1px solid var(--border);
+  padding:14px 20px calc(14px + var(--safe-bot));
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;
+}
+#btn-gallery{
+  width:54px;height:54px;border-radius:var(--radius);
+  border:1px solid var(--border2);background:var(--s2);
+  cursor:pointer;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:border-color .2s;
+  position:relative;
+}
+#btn-gallery:active{border-color:var(--accent);}
+#gallery-thumb{width:100%;height:100%;object-fit:cover;display:none;}
+#gallery-icon{color:var(--muted);font-size:22px;}
+#gallery-count{
+  position:absolute;top:4px;right:4px;
+  background:var(--accent);color:#000;
+  font-size:8px;font-weight:700;padding:1px 4px;border-radius:6px;
+  display:none;
+}
+
+#btn-shutter{
+  width:74px;height:74px;border-radius:50%;
+  border:3px solid var(--accent);background:transparent;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .15s;position:relative;
+}
+#btn-shutter:active{transform:scale(.92);}
+#shutter-inner{
+  width:60px;height:60px;border-radius:50%;background:var(--accent);
+  transition:all .15s;
+}
+#btn-shutter.flash #shutter-inner{background:#fff;transform:scale(.8);}
+#btn-shutter.no-gps{border-color:var(--warn);}
+#btn-shutter.no-gps #shutter-inner{background:var(--warn);}
+
+#btn-flip{
+  width:54px;height:54px;border-radius:50%;
+  border:1px solid var(--border2);background:var(--s2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--text);font-size:22px;flex-shrink:0;
+  transition:transform .35s;
+}
+#btn-flip:active{transform:rotate(180deg);}
+
+/* ===== BOTTOM NAV ===== */
+#bottom-nav{
+  background:var(--s1);border-top:1px solid var(--border);
+  display:flex;gap:4px;padding:8px 12px;overflow-x:auto;scrollbar-width:none;
+}
+#bottom-nav::-webkit-scrollbar{display:none;}
+.nav-tab{
+  flex-shrink:0;padding:7px 14px;border-radius:20px;
+  border:1px solid transparent;background:transparent;
+  color:var(--muted);font-family:var(--font);font-size:10px;letter-spacing:.08em;
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px;
+}
+.nav-tab.active,.nav-tab:active{
+  background:var(--accent-dim);border-color:var(--accent-glow);color:var(--accent);
+}
+
+/* ===== PANEL HEADER ===== */
+.panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(var(--safe-top) + 14px) 16px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--s1);
+}
+.panel-title{font-size:13px;letter-spacing:.15em;color:var(--text);}
+.back-btn{
+  padding:7px 14px;border-radius:20px;border:1px solid var(--border2);
+  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;
+  cursor:pointer;transition:all .15s;
+}
+.back-btn:active{border-color:var(--accent);color:var(--accent);}
+
+/* ===== PHOTOS PAGE ===== */
+#photo-grid{
+  flex:1;overflow-y:auto;padding:10px;
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;
+}
+.p-card{
+  background:var(--s2);border-radius:var(--radius);border:1px solid var(--border);
+  overflow:hidden;cursor:pointer;transition:border-color .2s;
+}
+.p-card:active{border-color:var(--accent);}
+.p-card img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;}
+.p-meta{padding:7px 9px;}
+.p-dt{font-size:9px;color:var(--muted);line-height:1.4;}
+.p-coord{font-size:9px;color:var(--accent);margin-top:2px;}
+.empty-grid{
+  grid-column:1/-1;text-align:center;padding:60px 20px;
+  color:var(--muted);font-size:11px;letter-spacing:.06em;line-height:2;
+}
+
+/* ===== VIEWER PAGE ===== */
+#viewer-img-wrap{flex:1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+#viewer-img{max-width:100%;max-height:100%;object-fit:contain;}
+#viewer-bottom{
+  background:var(--s1);border-top:1px solid var(--border);
+  padding:14px 16px calc(14px + var(--safe-bot));
+}
+.info-table{width:100%;font-size:11px;border-collapse:collapse;}
+.info-table td{padding:4px 0;}
+.info-table .lbl{color:var(--accent);font-size:8px;letter-spacing:.15em;width:40px;}
+.info-table .val{color:var(--text);}
+.action-row{display:flex;gap:8px;margin-top:12px;}
+.act-btn{
+  flex:1;padding:11px 8px;border-radius:10px;border:1px solid var(--border2);
+  background:var(--s2);color:var(--text);font-family:var(--font);font-size:10px;
+  cursor:pointer;text-align:center;letter-spacing:.05em;transition:all .15s;
+}
+.act-btn:active{opacity:.7;}
+.act-btn.primary{background:var(--accent-dim);border-color:var(--accent-glow);color:var(--accent);}
+.act-btn.red{border-color:rgba(239,68,68,.3);color:var(--danger);}
+
+/* ===== MAP PAGE ===== */
+#map-container{flex:1;position:relative;overflow:hidden;}
+#leaflet-map{width:100%;height:100%;}
+.map-legend{
+  position:absolute;bottom:12px;left:12px;z-index:1000;
+  background:rgba(8,12,18,.85);border:1px solid var(--border2);border-radius:10px;
+  padding:8px 12px;font-size:9px;color:var(--muted);letter-spacing:.06em;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.map-legend b{color:var(--accent);}
+
+/* ===== CANVAS (hidden) ===== */
+#canvas-hidden{display:none;}
+
+/* ===== FLASH ===== */
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999;transition:opacity .06s;}
+#flash.on{opacity:.85;}
+
+/* ===== TOAST ===== */
+#toast{
+  position:fixed;bottom:130px;left:50%;transform:translateX(-50%);
+  background:rgba(8,12,18,.92);color:var(--text);
+  padding:9px 20px;border-radius:24px;font-size:11px;letter-spacing:.05em;
+  border:1px solid var(--border2);opacity:0;transition:opacity .3s;
+  z-index:1001;white-space:nowrap;pointer-events:none;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+#toast.show{opacity:1;}
+#toast.ok{border-color:var(--accent-glow);color:var(--accent);}
+#toast.bad{border-color:rgba(239,68,68,.4);color:var(--danger);}
+
+/* ===== LOADING ===== */
+#loading{
+  position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+}
+.loader-ring{
+  width:48px;height:48px;border-radius:50%;
+  border:2px solid var(--border2);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);};}
+.loader-text{font-size:11px;color:var(--muted);letter-spacing:.1em;}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loader-ring"></div>
+  <div class="loader-text">SURVEYCAM กำลังโหลด...</div>
+</div>
+
+<div id="app">
+
+  <!-- ===== CAMERA PAGE ===== -->
+  <div id="page-camera" style="display:flex;flex-direction:column;height:100dvh;">
+    <div id="viewfinder">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="canvas-hidden"></canvas>
+
+      <div id="hud-top">
+        <div class="hud-row">
+          <div class="app-badge"><span class="dot"></span>SURVEYCAM</div>
+          <div id="hud-gps-status" class="warn">GPS...</div>
+          <div id="hud-clock">--:--:--</div>
+        </div>
+      </div>
+
+      <div class="reticle">
+        <div class="reticle-corner tl"></div>
+        <div class="reticle-corner tr"></div>
+        <div class="reticle-corner bl"></div>
+        <div class="reticle-corner br"></div>
+      </div>
+
+      <div id="zoom-control">
+        <button class="zoom-btn" onclick="zoomIn()">+</button>
+        <div id="zoom-label">1×</div>
+        <button class="zoom-btn" onclick="zoomOut()">−</button>
+      </div>
+
+      <div id="zoom-bar">
+        <div id="coords-strip">
+          <div class="coord-item"><span class="coord-lbl">LAT</span><span class="coord-val" id="ov-lat">--</span></div>
+          <div class="coord-item"><span class="coord-lbl">LNG</span><span class="coord-val" id="ov-lng">--</span></div>
+          <div class="coord-item"><span class="coord-lbl">ALT</span><span class="coord-val" id="ov-alt">-- m</span></div>
+          <div class="coord-item"><span class="coord-lbl">ACC</span><span class="coord-val" id="ov-acc">-- m</span></div>
+        </div>
+        <div id="date-strip">
+          <span id="ov-date">--/--/----</span>
+          <span id="ov-time">--:--:--</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="controls">
+      <button id="btn-gallery" onclick="goPage('photos')">
+        <img id="gallery-thumb" alt="">
+        <span id="gallery-icon">⊞</span>
+        <span id="gallery-count">0</span>
+      </button>
+      <button id="btn-shutter" onclick="capturePhoto()">
+        <div id="shutter-inner"></div>
+      </button>
+      <button id="btn-flip" onclick="flipCamera()">⟳</button>
+    </div>
+
+    <div id="bottom-nav">
+      <button class="nav-tab active">📷 กล้อง</button>
+      <button class="nav-tab" onclick="goPage('photos')">🗂 รูป <span id="nav-count">0</span></button>
+      <button class="nav-tab" onclick="goPage('map')">🗺 แผนที่</button>
+      <button class="nav-tab" onclick="exportCSV()">📊 CSV</button>
+    </div>
+  </div>
+
+  <!-- ===== PHOTOS PAGE ===== -->
+  <div id="page-photos" class="page">
+    <div class="panel-header">
+      <span class="panel-title">รูปภาพทั้งหมด</span>
+      <button class="back-btn" onclick="goBack()">← กลับ</button>
+    </div>
+    <div id="photo-grid"></div>
+  </div>
+
+  <!-- ===== VIEWER PAGE ===== -->
+  <div id="page-viewer" class="page">
+    <div class="panel-header" style="background:#000;">
+      <span class="panel-title" id="viewer-title">ภาพ 1/1</span>
+      <button class="back-btn" onclick="goBack()">← กลับ</button>
+    </div>
+    <div id="viewer-img-wrap"><img id="viewer-img" alt=""></div>
+    <div id="viewer-bottom">
+      <table class="info-table">
+        <tr><td class="lbl">LAT</td><td class="val" id="vi-lat">--</td></tr>
+        <tr><td class="lbl">LNG</td><td class="val" id="vi-lng">--</td></tr>
+        <tr><td class="lbl">ALT</td><td class="val" id="vi-alt">--</td></tr>
+        <tr><td class="lbl">ACC</td><td class="val" id="vi-acc">--</td></tr>
+        <tr><td class="lbl">เวลา</td><td class="val" id="vi-time">--</td></tr>
+        <tr><td class="lbl">วันที่</td><td class="val" id="vi-date">--</td></tr>
+      </table>
+      <div class="action-row">
+        <button class="act-btn primary" onclick="saveToGallery()">⬇ บันทึก Gallery</button>
+        <button class="act-btn" onclick="sharePhoto()">↗ แชร์</button>
+        <button class="act-btn red" onclick="deletePhoto()">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MAP PAGE ===== -->
+  <div id="page-map" class="page">
+    <div class="panel-header">
+      <span class="panel-title">แผนที่ตำแหน่งรูป</span>
+      <button class="back-btn" onclick="goBack()">← กลับ</button>
+    </div>
+    <div id="map-container">
+      <div id="leaflet-map"></div>
+      <div class="map-legend">
+        <b id="map-count">0</b> จุดสำรวจ · แตะหมุดเพื่อดูรายละเอียด
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="flash"></div>
+<div id="toast"></div>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const DB_KEY = 'scam_v2_photos';
+let photos = [];
+let gps = null;
+let facing = 'environment';
+let stream = null;
+let zoomLevel = 1;
+let zoomCapabilities = null;
+let pageStack = [];
+let viewerIdx = -1;
+let leafMap = null;
+
+// load from storage safely
+try {
+  const raw = localStorage.getItem(DB_KEY);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    // strip dataURL from map entries to save space — keep full ones
+    photos = parsed;
+  }
+} catch(e) { photos = []; }
+
+// ============================================================
+// UTILS
+// ============================================================
+function pad(n){return String(n).padStart(2,'0');}
+function thaiYear(y){return y+543;}
+function fmtDate(d){return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${thaiYear(d.getFullYear())}`;}
+function fmtTime(d){return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;}
+
+function showToast(msg, type=''){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' '+type : '');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(()=>t.className='', 2600);
+}
+
+function saveDB(){
+  try { localStorage.setItem(DB_KEY, JSON.stringify(photos)); }
+  catch(e){
+    // storage full — trim oldest
+    while(photos.length > 80){photos.pop();}
+    try { localStorage.setItem(DB_KEY, JSON.stringify(photos)); } catch(ee){}
+  }
+}
+
+function updateCounts(){
+  const n = photos.length;
+  document.getElementById('nav-count').textContent = n;
+  const cnt = document.getElementById('gallery-count');
+  if(n>0){cnt.style.display='block';cnt.textContent=n;}
+  else cnt.style.display='none';
+  if(n>0){
+    document.getElementById('gallery-thumb').src = photos[0].dataURL;
+    document.getElementById('gallery-thumb').style.display='block';
+    document.getElementById('gallery-icon').style.display='none';
+  }
+}
+
+// ============================================================
+// PAGE NAV
+// ============================================================
+function goPage(name){
+  const el = document.getElementById('page-'+name);
+  if(!el) return;
+  pageStack.push(name);
+  el.classList.add('active');
+  if(name==='photos') renderPhotos();
+  if(name==='map') initMap();
+}
+function goBack(){
+  if(!pageStack.length) return;
+  const cur = pageStack.pop();
+  document.getElementById('page-'+cur)?.classList.remove('active');
+}
+
+// ============================================================
+// GPS
+// ============================================================
+function startGPS(){
+  if(!navigator.geolocation){ showToast('ไม่รองรับ GPS','bad'); return; }
+  navigator.geolocation.watchPosition(pos=>{
+    gps = {lat:pos.coords.latitude,lng:pos.coords.longitude,alt:pos.coords.altitude,acc:pos.coords.accuracy};
+    const st = document.getElementById('hud-gps-status');
+    if(gps.acc < 15){st.className='';st.textContent='GPS ±'+Math.round(gps.acc)+'m';}
+    else if(gps.acc < 60){st.className='warn';st.textContent='GPS ±'+Math.round(gps.acc)+'m';}
+    else{st.className='err';st.textContent='GPS ต่ำ';}
+    document.getElementById('ov-lat').textContent = gps.lat.toFixed(7)+'°';
+    document.getElementById('ov-lng').textContent = gps.lng.toFixed(7)+'°';
+    document.getElementById('ov-alt').textContent = gps.alt ? gps.alt.toFixed(1)+' m' : '--';
+    document.getElementById('ov-acc').textContent = '±'+Math.round(gps.acc)+' m';
+    document.getElementById('btn-shutter').classList.remove('no-gps');
+  }, err=>{
+    const st = document.getElementById('hud-gps-status');
+    st.className='err'; st.textContent='ไม่มี GPS';
+    document.getElementById('btn-shutter').classList.add('no-gps');
+  },{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hud-clock').textContent = fmtTime(d);
+    document.getElementById('ov-time').textContent = fmtTime(d);
+    document.getElementById('ov-date').textContent = fmtDate(d);
+  }
+  tick(); setInterval(tick,1000);
+}
+
+// ============================================================
+// CAMERA
+// ============================================================
+async function startCamera(f){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:f,width:{ideal:4096},height:{ideal:2160}},audio:false
+    });
+    const v = document.getElementById('video');
+    v.srcObject = stream;
+    // check zoom support
+    const track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    zoomCapabilities = (caps.zoom) ? caps.zoom : null;
+    zoomLevel = 1;
+    document.getElementById('zoom-label').textContent = '1×';
+    applyZoom();
+  } catch(e){ showToast('ไม่สามารถเปิดกล้องได้','bad'); }
+}
+
+function flipCamera(){
+  facing = facing==='environment'?'user':'environment';
+  startCamera(facing);
+}
+
+function applyZoom(){
+  const v = document.getElementById('video');
+  if(zoomCapabilities){
+    const track = stream?.getVideoTracks()[0];
+    if(track && track.applyConstraints){
+      track.applyConstraints({advanced:[{zoom:zoomLevel}]}).catch(()=>{});
+    }
+  } else {
+    // CSS zoom fallback
+    v.style.transform = `scale(${zoomLevel})`;
+    v.style.transformOrigin = 'center center';
+  }
+  document.getElementById('zoom-label').textContent = zoomLevel.toFixed(1)+'×';
+}
+
+function zoomIn(){
+  if(zoomCapabilities){
+    zoomLevel = Math.min(zoomLevel+0.5, zoomCapabilities.max||8);
+  } else {
+    zoomLevel = Math.min(zoomLevel+0.5, 4);
+  }
+  applyZoom();
+}
+function zoomOut(){
+  if(zoomCapabilities){
+    zoomLevel = Math.max(zoomLevel-0.5, zoomCapabilities.min||1);
+  } else {
+    zoomLevel = Math.max(zoomLevel-0.5, 1);
+  }
+  applyZoom();
+}
+
+// pinch zoom
+let pinchDist0 = null, pinchZoom0 = 1;
+document.addEventListener('touchstart',e=>{
+  if(e.touches.length===2 && document.getElementById('page-camera').contains(e.target)){
+    pinchDist0 = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    pinchZoom0 = zoomLevel;
+  }
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if(e.touches.length===2 && pinchDist0){
+    const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    zoomLevel = Math.max(1, Math.min(pinchZoom0*(d/pinchDist0), 4));
+    applyZoom();
+  }
+},{passive:true});
+document.addEventListener('touchend',()=>{ pinchDist0=null; },{passive:true});
+
+// ============================================================
+// CAPTURE
+// ============================================================
+function capturePhoto(){
+  const v = document.getElementById('video');
+  if(!v.videoWidth){ showToast('กล้องยังไม่พร้อม','bad'); return; }
+
+  const btn = document.getElementById('btn-shutter');
+  btn.classList.add('flash');
+  document.getElementById('flash').classList.add('on');
+  setTimeout(()=>{
+    document.getElementById('flash').classList.remove('on');
+    btn.classList.remove('flash');
+  },130);
+
+  const W=v.videoWidth, H=v.videoHeight;
+  const canvas = document.getElementById('canvas-hidden');
+  canvas.width=W; canvas.height=H;
+  const ctx = canvas.getContext('2d');
+
+  if(facing==='user'){ ctx.translate(W,0); ctx.scale(-1,1); }
+  ctx.drawImage(v,0,0,W,H);
+  if(facing==='user') ctx.setTransform(1,0,0,1,0,0);
+
+  // stamp
+  const now = new Date();
+  const fSz = Math.round(W*0.021);
+  ctx.font = `bold ${fSz}px "Courier New",monospace`;
+
+  const lines = gps ? [
+    `LAT: ${gps.lat.toFixed(7)}°`,
+    `LNG: ${gps.lng.toFixed(7)}°`,
+    `ALT: ${gps.alt?gps.alt.toFixed(1)+' m':'--'}   ACC: ±${Math.round(gps.acc)}m`,
+    `${fmtDate(now)}  ${fmtTime(now)}`,
+    `SURVEYCAM v2`
+  ] : [
+    `[ไม่มีข้อมูล GPS]`,
+    `${fmtDate(now)}  ${fmtTime(now)}`,
+    `SURVEYCAM v2`
+  ];
+
+  const lh = fSz*1.55, pad = fSz*.7;
+  const boxH = lines.length*lh + pad*1.5;
+  const maxW = lines.reduce((a,l)=>Math.max(a,ctx.measureText(l).width),0);
+
+  ctx.fillStyle='rgba(8,12,18,0.72)';
+  ctx.fillRect(pad*.4, H-boxH, maxW+pad*2, boxH+pad*.4);
+
+  lines.forEach((l,i)=>{
+    ctx.fillStyle = i===lines.length-1 ? '#00e5b0' : (i<3?'#eef2ff':'#94a3b8');
+    ctx.fillText(l, pad, H-boxH+pad+(i+1)*lh);
+  });
+
+  const dataURL = canvas.toDataURL('image/jpeg',0.92);
+  const entry = {
+    id:Date.now(), dataURL,
+    lat:gps?.lat??null, lng:gps?.lng??null,
+    alt:gps?.alt??null, acc:gps?.acc??null,
+    dt:now.toISOString()
+  };
+  photos.unshift(entry);
+  saveDB();
+  updateCounts();
+  showToast(gps ? `✓ บันทึกแล้ว  GPS ±${Math.round(gps.acc)}m` : '✓ บันทึกแล้ว (ไม่มี GPS)','ok');
+}
+
+// ============================================================
+// PHOTOS LIST
+// ============================================================
+function renderPhotos(){
+  const g = document.getElementById('photo-grid');
+  if(!photos.length){
+    g.innerHTML='<div class="empty-grid">📷<br><br>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';
+    return;
+  }
+  g.innerHTML = photos.map((p,i)=>{
+    const d = new Date(p.dt);
+    return `<div class="p-card" onclick="openViewer(${i})">
+      <img src="${p.dataURL}" loading="lazy" alt="">
+      <div class="p-meta">
+        <div class="p-dt">${fmtDate(d)} ${fmtTime(d)}</div>
+        <div class="p-coord">${p.lat ? p.lat.toFixed(5)+', '+p.lng.toFixed(5) : 'ไม่มี GPS'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// VIEWER
+// ============================================================
+function openViewer(idx){
+  viewerIdx = idx;
+  const p = photos[idx];
+  const d = new Date(p.dt);
+  document.getElementById('viewer-img').src = p.dataURL;
+  document.getElementById('viewer-title').textContent = `ภาพ ${idx+1}/${photos.length}`;
+  document.getElementById('vi-lat').textContent = p.lat ? p.lat.toFixed(7)+'°' : 'ไม่มีข้อมูล';
+  document.getElementById('vi-lng').textContent = p.lng ? p.lng.toFixed(7)+'°' : 'ไม่มีข้อมูล';
+  document.getElementById('vi-alt').textContent = p.alt ? p.alt.toFixed(1)+' m' : '--';
+  document.getElementById('vi-acc').textContent = p.acc ? '±'+Math.round(p.acc)+' m' : '--';
+  document.getElementById('vi-time').textContent = fmtTime(d);
+  document.getElementById('vi-date').textContent = fmtDate(d);
+  goPage('viewer');
+}
+
+function saveToGallery(){
+  if(viewerIdx<0) return;
+  const p = photos[viewerIdx];
+  const d = new Date(p.dt);
+  const name = `survey_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.jpg`;
+  const a = document.createElement('a');
+  a.href = p.dataURL; a.download = name; a.click();
+  showToast('บันทึก '+name,'ok');
+}
+
+async function sharePhoto(){
+  if(viewerIdx<0) return;
+  const p = photos[viewerIdx];
+  if(navigator.share && navigator.canShare){
+    try{
+      const res = await fetch(p.dataURL);
+      const blob = await res.blob();
+      const file = new File([blob],'survey.jpg',{type:'image/jpeg'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:'SurveyCAM'});
+        return;
+      }
+    } catch(e){}
+  }
+  saveToGallery();
+}
+
+function deletePhoto(){
+  if(viewerIdx<0) return;
+  if(!confirm('ลบรูปนี้?')) return;
+  photos.splice(viewerIdx,1);
+  saveDB(); updateCounts();
+  goBack();
+  showToast('ลบแล้ว');
+}
+
+// ============================================================
+// MAP
+// ============================================================
+function initMap(){
+  const pts = photos.filter(p=>p.lat);
+  document.getElementById('map-count').textContent = pts.length;
+
+  if(leafMap){ 
+    leafMap.remove(); leafMap=null;
+  }
+
+  const center = pts.length ? [pts[0].lat, pts[0].lng] : (gps ? [gps.lat,gps.lng] : [13.7563,100.5018]);
+
+  leafMap = L.map('leaflet-map',{zoomControl:false}).setView(center, 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap',maxZoom:19
+  }).addTo(leafMap);
+  L.control.zoom({position:'topright'}).addTo(leafMap);
+
+  // custom marker icon
+  const mkIcon = idx => L.divIcon({
+    html:`<div style="background:#00e5b0;color:#000;font-size:9px;font-weight:700;font-family:monospace;width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5)"><span style="transform:rotate(45deg)">${idx+1}</span></div>`,
+    className:'',iconSize:[24,24],iconAnchor:[12,24]
+  });
+
+  pts.forEach((p,i)=>{
+    const d = new Date(p.dt);
+    const marker = L.marker([p.lat,p.lng],{icon:mkIcon(i)}).addTo(leafMap);
+    marker.bindPopup(`
+      <div style="font-family:monospace;font-size:11px;min-width:180px;">
+        <img src="${p.dataURL}" style="width:100%;border-radius:4px;margin-bottom:6px;display:block;">
+        <b style="color:#00e5b0">ภาพที่ ${i+1}</b><br>
+        ${fmtDate(d)} ${fmtTime(d)}<br>
+        ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}<br>
+        ${p.acc ? '±'+Math.round(p.acc)+'m' : ''}
+      </div>
+    `);
+  });
+
+  if(pts.length>1){
+    const line = L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.6,dashArray:'4 6'}).addTo(leafMap);
+    leafMap.fitBounds(line.getBounds(),{padding:[30,30]});
+  }
+
+  // current position
+  if(gps){
+    L.circleMarker([gps.lat,gps.lng],{radius:8,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.5,weight:2}).addTo(leafMap).bindPopup('ตำแหน่งปัจจุบัน');
+  }
+}
+
+// ============================================================
+// CSV EXPORT
+// ============================================================
+function exportCSV(){
+  if(!photos.length){ showToast('ยังไม่มีรูปภาพ','bad'); return; }
+  const rows=[['no','datetime_iso','date_th','time','lat','lng','altitude_m','accuracy_m']];
+  photos.forEach((p,i)=>{
+    const d=new Date(p.dt);
+    rows.push([i+1,p.dt,fmtDate(d),fmtTime(d),p.lat??'',p.lng??'',p.alt!=null?p.alt.toFixed(2):'',p.acc!=null?Math.round(p.acc):'']);
+  });
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`surveycam_${Date.now()}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  showToast(`ส่งออก CSV ${photos.length} รายการ`,'ok');
+}
+
+// ============================================================
+// PWA SERVICE WORKER
+// ============================================================
+const SW_CODE = `
+const CACHE = 'scam-v2';
+const SHELL = [location.href];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+});
+`;
+if('serviceWorker' in navigator){
+  const blob = new Blob([SW_CODE],{type:'application/javascript'});
+  const swURL = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swURL).catch(()=>{});
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('load',()=>{
+  document.getElementById('loading').style.display='none';
+  startCamera('environment');
+  startGPS();
+  startClock();
+  updateCounts();
+});
+</script>
+</body>
+</html>
