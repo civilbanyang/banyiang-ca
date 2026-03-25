@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SurveyCAM">
+<meta name="theme-color" content="#080c12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>SurveyCAM</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#080c12;--s1:#0e1420;--s2:#141c2e;
+  --accent:#00e5b0;--adim:rgba(0,229,176,.15);--aglow:rgba(0,229,176,.3);
+  --warn:#f59e0b;--danger:#ef4444;
+  --text:#eef2ff;--muted:#64748b;
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);
+  --font:'SF Mono','Fira Code','Courier New',monospace;
+  --r:12px;
+  --st:env(safe-area-inset-top,0px);
+  --sb:env(safe-area-inset-bottom,0px);
+}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:100%;overflow:hidden;}
+#app{display:flex;flex-direction:column;height:100dvh;position:relative;overflow:hidden;}
+
+/* PAGES */
+.page{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:10;}
+.page.active{transform:translateX(0);}
+#pg-cam{position:relative;transform:none;z-index:1;}
+
+/* VIEWFINDER */
+#vf{flex:1;position:relative;overflow:hidden;background:#000;}
+#video{width:100%;height:100%;object-fit:cover;display:block;}
+#vf::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.025) 2px,rgba(0,0,0,.025) 4px);z-index:2;}
+
+/* GPS METER STRIP */
+#meter{position:absolute;top:0;left:0;right:0;height:3px;z-index:6;background:rgba(0,0,0,.3);}
+#meter-fill{height:100%;width:0;transition:width .5s,background .5s;}
+
+/* TOP HUD */
+#hud{position:absolute;top:0;left:0;right:0;z-index:5;
+  padding:calc(var(--st) + 10px) 14px 0;
+  background:linear-gradient(rgba(8,12,18,.82),transparent);pointer-events:none;}
+.hud-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;}
+.badge{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.2em;color:var(--accent);font-weight:700;}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+#hclock{font-size:13px;color:rgba(255,255,255,.9);letter-spacing:.08em;}
+#hgps{font-size:9px;letter-spacing:.1em;padding:3px 8px;border-radius:20px;
+  border:1px solid var(--aglow);background:var(--adim);color:var(--accent);}
+#hgps.warn{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.15);color:var(--warn);}
+#hgps.err{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:var(--danger);}
+
+/* RETICLE */
+.ret{position:absolute;inset:10%;pointer-events:none;z-index:3;}
+.rc{position:absolute;width:22px;height:22px;}
+.rc::before,.rc::after{content:'';position:absolute;background:var(--accent);opacity:.8;}
+.rc.tl{top:0;left:0}.rc.tl::before{width:2px;height:100%;top:0;left:0}.rc.tl::after{height:2px;width:100%;top:0;left:0}
+.rc.tr{top:0;right:0}.rc.tr::before{width:2px;height:100%;top:0;right:0}.rc.tr::after{height:2px;width:100%;top:0;right:0}
+.rc.bl{bottom:0;left:0}.rc.bl::before{width:2px;height:100%;bottom:0;left:0}.rc.bl::after{height:2px;width:100%;bottom:0;left:0}
+.rc.br{bottom:0;right:0}.rc.br::before{width:2px;height:100%;bottom:0;right:0}.rc.br::after{height:2px;width:100%;bottom:0;right:0}
+
+/* ZOOM SIDE */
+#zctrl{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;z-index:5;}
+.zbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border2);
+  background:rgba(8,12,18,.75);color:var(--text);font-size:20px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:all .15s;}
+.zbtn:active{background:var(--adim);border-color:var(--accent);}
+#zlbl{font-size:10px;color:var(--accent);background:rgba(8,12,18,.75);
+  padding:3px 7px;border-radius:6px;border:1px solid var(--adim);}
+
+/* GPS OVERLAY BOTTOM — ตัวใหญ่ */
+#gbot{position:absolute;bottom:0;left:0;right:0;z-index:5;
+  background:linear-gradient(transparent,rgba(8,12,18,.93));pointer-events:none;}
+#cstrip{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:10px 14px 6px;}
+.ci{display:flex;gap:7px;align-items:baseline;}
+.cl{color:var(--accent);font-size:9px;letter-spacing:.18em;min-width:28px;font-weight:700;}
+.cv{color:#fff;font-size:14px;letter-spacing:.03em;font-weight:600;}
+#dstrip{display:flex;justify-content:space-between;padding:2px 14px 12px;
+  font-size:13px;color:rgba(255,255,255,.88);letter-spacing:.06em;font-weight:600;}
+
+/* GPS LOCK */
+#glock{position:absolute;inset:0;z-index:20;background:rgba(8,12,18,.9);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+#glock.show{display:flex;}
+.lring{width:64px;height:64px;border-radius:50%;border:2px solid var(--border2);
+  border-top-color:var(--accent);animation:spin .9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ltxt{font-size:12px;color:var(--text);letter-spacing:.1em;text-align:center;line-height:1.9;}
+.lacc{font-size:22px;color:var(--accent);font-weight:700;}
+.lskip{margin-top:6px;padding:9px 22px;border-radius:20px;border:1px solid var(--border2);
+  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;cursor:pointer;}
+
+/* CONTROLS */
+#ctrl{background:var(--s1);border-top:1px solid var(--border);
+  padding:14px 20px calc(14px + var(--sb));
+  display:flex;align-items:center;justify-content:space-between;gap:16px;}
+#bgal{width:54px;height:54px;border-radius:var(--r);border:1px solid var(--border2);
+  background:var(--s2);cursor:pointer;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;transition:border-color .2s;}
+#bgal:active{border-color:var(--accent);}
+#gthumb{width:100%;height:100%;object-fit:cover;display:none;}
+#gicon{color:var(--muted);font-size:22px;}
+#gcnt{position:absolute;top:4px;right:4px;background:var(--accent);color:#000;
+  font-size:8px;font-weight:700;padding:1px 4px;border-radius:6px;display:none;}
+#bshut{width:74px;height:74px;border-radius:50%;border:3px solid var(--accent);
+  background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .15s;}
+#bshut:active{transform:scale(.92);}
+#sinr{width:60px;height:60px;border-radius:50%;background:var(--accent);transition:all .15s;}
+#bshut.fl #sinr{background:#fff;transform:scale(.8);}
+#bshut.ng{border-color:var(--warn);}#bshut.ng #sinr{background:var(--warn);}
+#bflip{width:54px;height:54px;border-radius:50%;border:1px solid var(--border2);
+  background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--text);font-size:22px;flex-shrink:0;transition:transform .35s;}
+#bflip:active{transform:rotate(180deg);}
+
+/* NAV */
+#nav{background:var(--s1);border-top:1px solid var(--border);
+  display:flex;gap:4px;padding:8px 12px;overflow-x:auto;scrollbar-width:none;}
+#nav::-webkit-scrollbar{display:none;}
+.ntab{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid transparent;
+  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;
+  letter-spacing:.08em;cursor:pointer;transition:all .2s;}
+.ntab.on,.ntab:active{background:var(--adim);border-color:var(--aglow);color:var(--accent);}
+
+/* PANEL HEADER */
+.ph{display:flex;align-items:center;justify-content:space-between;
+  padding:calc(var(--st) + 14px) 16px 14px;border-bottom:1px solid var(--border);background:var(--s1);}
+.pt{font-size:13px;letter-spacing:.15em;color:var(--text);}
+.bk{padding:7px 14px;border-radius:20px;border:1px solid var(--border2);
+  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;cursor:pointer;}
+.bk:active{border-color:var(--accent);color:var(--accent);}
+
+/* PHOTOS */
+#pgrid{flex:1;overflow-y:auto;padding:10px;
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;}
+.pc{background:var(--s2);border-radius:var(--r);border:1px solid var(--border);
+  overflow:hidden;cursor:pointer;transition:border-color .2s;}
+.pc:active{border-color:var(--accent);}
+.pc img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;}
+.pm{padding:7px 9px;}
+.pdt{font-size:9px;color:var(--muted);line-height:1.4;}
+.pco{font-size:9px;color:var(--accent);margin-top:2px;}
+.emp{grid-column:1/-1;text-align:center;padding:60px 20px;
+  color:var(--muted);font-size:11px;letter-spacing:.06em;line-height:2;}
+
+/* VIEWER */
+#vwrap{flex:1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+#vimg{max-width:100%;max-height:100%;object-fit:contain;}
+#vbot{background:var(--s1);border-top:1px solid var(--border);
+  padding:14px 16px calc(14px + var(--sb));}
+.itbl{width:100%;font-size:11px;border-collapse:collapse;}
+.itbl td{padding:4px 0;}
+.itbl .lb{color:var(--accent);font-size:8px;letter-spacing:.15em;width:40px;}
+.itbl .vl{color:var(--text);}
+.arow{display:flex;gap:8px;margin-top:12px;}
+.ab{flex:1;padding:11px 8px;border-radius:10px;border:1px solid var(--border2);
+  background:var(--s2);color:var(--text);font-family:var(--font);font-size:10px;
+  cursor:pointer;text-align:center;letter-spacing:.05em;transition:all .15s;}
+.ab:active{opacity:.7;}
+.ab.pr{background:var(--adim);border-color:var(--aglow);color:var(--accent);}
+.ab.gm{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.35);color:#60a5fa;}
+.ab.rd{border-color:rgba(239,68,68,.3);color:var(--danger);}
+
+/* MAP */
+#mcon{flex:1;position:relative;overflow:hidden;}
+#lmap{width:100%;height:100%;}
+.mleg{position:absolute;bottom:12px;left:12px;z-index:1000;
+  background:rgba(8,12,18,.88);border:1px solid var(--border2);border-radius:10px;
+  padding:8px 12px;font-size:9px;color:var(--muted);letter-spacing:.06em;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+.mleg b{color:var(--accent);}
+
+/* INSTALL BANNER */
+#ibanner{position:fixed;bottom:0;left:0;right:0;z-index:500;
+  background:var(--s1);border-top:2px solid var(--accent);
+  padding:14px 16px calc(14px + var(--sb));
+  display:none;flex-direction:column;gap:10px;
+  box-shadow:0 -8px 32px rgba(0,229,176,.15);}
+#ibanner.show{display:flex;}
+.itop{display:flex;align-items:center;gap:12px;}
+.iico{width:44px;height:44px;border-radius:10px;background:var(--adim);
+  border:1px solid var(--aglow);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.iinf .itit{font-size:13px;color:var(--text);font-weight:700;letter-spacing:.05em;}
+.iinf .isub{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5;}
+.ibtns{display:flex;gap:8px;}
+#binstall{flex:1;padding:11px;border-radius:10px;background:var(--accent);color:#000;
+  font-family:var(--font);font-size:11px;font-weight:700;border:none;cursor:pointer;letter-spacing:.08em;}
+#bdismiss{padding:11px 16px;border-radius:10px;border:1px solid var(--border2);
+  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;cursor:pointer;}
+
+/* iOS GUIDE */
+#iosguide{position:fixed;inset:0;z-index:600;background:rgba(8,12,18,.93);
+  display:none;flex-direction:column;align-items:center;justify-content:flex-end;
+  padding-bottom:calc(20px + var(--sb));}
+#iosguide.show{display:flex;}
+.iosc{background:var(--s2);border:1px solid var(--border2);border-radius:16px;
+  padding:20px;margin:0 16px;width:calc(100% - 32px);max-width:360px;}
+.iosc h3{font-size:13px;color:var(--accent);letter-spacing:.1em;margin-bottom:14px;}
+.iost{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;font-size:12px;line-height:1.6;}
+.iost .n{background:var(--adim);color:var(--accent);border-radius:50%;
+  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;flex-shrink:0;}
+.iarr{font-size:26px;margin-top:14px;animation:bounce .8s infinite;}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+#biosclose{margin-top:12px;width:100%;padding:11px;border-radius:10px;
+  border:1px solid var(--border2);background:transparent;
+  color:var(--muted);font-family:var(--font);font-size:10px;cursor:pointer;}
+
+#cvs{display:none;}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999;transition:opacity .06s;}
+#flash.on{opacity:.85;}
+#toast{position:fixed;bottom:130px;left:50%;transform:translateX(-50%);
+  background:rgba(8,12,18,.93);color:var(--text);padding:9px 20px;border-radius:24px;
+  font-size:11px;letter-spacing:.05em;border:1px solid var(--border2);opacity:0;transition:opacity .3s;
+  z-index:1001;white-space:nowrap;pointer-events:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+#toast.show{opacity:1;}
+#toast.ok{border-color:var(--aglow);color:var(--accent);}
+#toast.bad{border-color:rgba(239,68,68,.4);color:var(--danger);}
+#splash{position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.sring{width:48px;height:48px;border-radius:50%;border:2px solid var(--border2);
+  border-top-color:var(--accent);animation:spin .8s linear infinite;}
+.stxt{font-size:11px;color:var(--muted);letter-spacing:.1em;}
+</style>
+</head>
+<body>
+
+<div id="splash"><div class="sring"></div><div class="stxt">SURVEYCAM กำลังโหลด...</div></div>
+
+<div id="app">
+
+  <!-- CAMERA -->
+  <div id="pg-cam" style="display:flex;flex-direction:column;height:100dvh;">
+    <div id="vf">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="cvs"></canvas>
+      <div id="meter"><div id="meter-fill"></div></div>
+      <div id="hud">
+        <div class="hud-row">
+          <div class="badge"><span class="dot"></span>SURVEYCAM</div>
+          <div id="hgps" class="warn">GPS...</div>
+          <div id="hclock">--:--:--</div>
+        </div>
+      </div>
+      <div class="ret">
+        <div class="rc tl"></div><div class="rc tr"></div>
+        <div class="rc bl"></div><div class="rc br"></div>
+      </div>
+      <div id="zctrl">
+        <button class="zbtn" onclick="zIn()">+</button>
+        <div id="zlbl">1×</div>
+        <button class="zbtn" onclick="zOut()">−</button>
+      </div>
+      <div id="glock">
+        <div class="lring"></div>
+        <div class="ltxt">กำลังล็อก GPS<br>รอสัญญาณแม่นยำ</div>
+        <div class="lacc" id="lacv">-- m</div>
+        <button class="lskip" onclick="skipLock()">ถ่ายทันที (ข้ามรอ GPS)</button>
+      </div>
+      <div id="gbot">
+        <div id="cstrip">
+          <div class="ci"><span class="cl">LAT</span><span class="cv" id="olat">--</span></div>
+          <div class="ci"><span class="cl">LNG</span><span class="cv" id="olng">--</span></div>
+          <div class="ci"><span class="cl">ALT</span><span class="cv" id="oalt">--</span></div>
+          <div class="ci"><span class="cl">ACC</span><span class="cv" id="oacc">--</span></div>
+        </div>
+        <div id="dstrip"><span id="odate">--/--/----</span><span id="otime">--:--:--</span></div>
+      </div>
+    </div>
+    <div id="ctrl">
+      <button id="bgal" onclick="goPg('photos')">
+        <img id="gthumb" alt=""><span id="gicon">⊞</span><span id="gcnt"></span>
+      </button>
+      <button id="bshut" onclick="pressShutter()"><div id="sinr"></div></button>
+      <button id="bflip" onclick="flipCam()">⟳</button>
+    </div>
+    <div id="nav">
+      <button class="ntab on">📷 กล้อง</button>
+      <button class="ntab" onclick="goPg('photos')">🗂 รูป <span id="ncount">0</span></button>
+      <button class="ntab" onclick="goPg('map')">🗺 แผนที่</button>
+      <button class="ntab" onclick="doCSV()">📊 CSV</button>
+      <button class="ntab" id="btinst" onclick="trigInst()" style="display:none">⬇ ติดตั้ง</button>
+    </div>
+  </div>
+
+  <!-- PHOTOS -->
+  <div id="pg-photos" class="page">
+    <div class="ph"><span class="pt">รูปภาพทั้งหมด</span><button class="bk" onclick="goBack()">← กลับ</button></div>
+    <div id="pgrid"></div>
+  </div>
+
+  <!-- VIEWER -->
+  <div id="pg-viewer" class="page">
+    <div class="ph" style="background:#000">
+      <span class="pt" id="vtit">ภาพ 1/1</span>
+      <button class="bk" onclick="goBack()">← กลับ</button>
+    </div>
+    <div id="vwrap"><img id="vimg" alt=""></div>
+    <div id="vbot">
+      <table class="itbl">
+        <tr><td class="lb">LAT</td><td class="vl" id="vilat">--</td></tr>
+        <tr><td class="lb">LNG</td><td class="vl" id="vilng">--</td></tr>
+        <tr><td class="lb">ALT</td><td class="vl" id="vialt">--</td></tr>
+        <tr><td class="lb">ACC</td><td class="vl" id="viacc">--</td></tr>
+        <tr><td class="lb">เวลา</td><td class="vl" id="vitm">--</td></tr>
+        <tr><td class="lb">วันที่</td><td class="vl" id="vidt">--</td></tr>
+      </table>
+      <div class="arow">
+        <button class="ab pr" onclick="saveGal()">⬇ บันทึก</button>
+        <button class="ab gm" onclick="openGMaps()">🗺 Maps</button>
+        <button class="ab" onclick="shareP()">↗ แชร์</button>
+        <button class="ab rd" onclick="delP()">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div id="pg-map" class="page">
+    <div class="ph"><span class="pt">แผนที่ตำแหน่งรูป</span><button class="bk" onclick="goBack()">← กลับ</button></div>
+    <div id="mcon">
+      <div id="lmap"></div>
+      <div class="mleg"><b id="mcount">0</b> จุดสำรวจ · แตะหมุดเพื่อดูรายละเอียด</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- INSTALL BANNER -->
+<div id="ibanner">
+  <div class="itop">
+    <div class="iico">📷</div>
+    <div class="iinf">
+      <div class="itit">ติดตั้ง SurveyCAM</div>
+      <div class="isub">ใช้งานแบบ app ได้เลย · ทำงาน offline<br>ไม่ต้องเปิด browser ทุกครั้ง</div>
+    </div>
+  </div>
+  <div class="ibtns">
+    <button id="binstall" onclick="doInst()">⬇ ติดตั้งเลย</button>
+    <button id="bdismiss" onclick="dimInst()">ไว้ทีหลัง</button>
+  </div>
+</div>
+
+<!-- iOS GUIDE -->
+<div id="iosguide" onclick="this.classList.remove('show')">
+  <div class="iosc" onclick="event.stopPropagation()">
+    <h3>📱 ติดตั้งบน iPhone / iPad</h3>
+    <div class="iost"><div class="n">1</div><div>กดปุ่ม <b style="color:var(--accent)">แชร์ (□↑)</b> ที่แถบล่าง Safari</div></div>
+    <div class="iost"><div class="n">2</div><div>เลื่อนลงแล้วกด <b style="color:var(--accent)">"Add to Home Screen"</b></div></div>
+    <div class="iost"><div class="n">3</div><div>กด <b style="color:var(--accent)">"Add"</b> มุมขวาบน — เสร็จแล้ว!</div></div>
+    <button id="biosclose" onclick="document.getElementById('iosguide').classList.remove('show')">ปิด</button>
+  </div>
+  <div class="iarr">↓</div>
+</div>
+
+<div id="flash"></div>
+<div id="toast"></div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================
+   STATE
+============================================================ */
+const KEY = 'scam4';
+let photos = [], gps = null, bestGps = null, gpsHist = [];
+let facing = 'environment', stream = null, zLv = 1, zCaps = null;
+let stack = [], vIdx = -1, lmap = null;
+let dip = null, lockPending = false;
+const GOOD = 15; // GPS ±15m ถือว่าแม่น
+
+try { photos = JSON.parse(localStorage.getItem(KEY)||'[]'); } catch(e) { photos=[]; }
+
+/* ============================================================
+   UTILS
+============================================================ */
+const p2 = n => String(n).padStart(2,'0');
+const thY = y => y+543;
+const fD = d => `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${thY(d.getFullYear())}`;
+const fT = d => `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+
+function toast(msg, type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show'+(type?' '+type:'');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.className='',2800);
+}
+
+function saveDB(){
+  try{ localStorage.setItem(KEY,JSON.stringify(photos)); }
+  catch(e){ while(photos.length>80)photos.pop(); try{localStorage.setItem(KEY,JSON.stringify(photos));}catch(ee){} }
+}
+
+function updCnt(){
+  const n=photos.length;
+  document.getElementById('ncount').textContent=n;
+  const c=document.getElementById('gcnt');
+  if(n>0){c.style.display='block';c.textContent=n;}else c.style.display='none';
+  if(n>0){
+    document.getElementById('gthumb').src=photos[0].dataURL;
+    document.getElementById('gthumb').style.display='block';
+    document.getElementById('gicon').style.display='none';
+  }
+}
+
+/* ============================================================
+   PAGE NAV
+============================================================ */
+function goPg(name){
+  stack.push(name);
+  document.getElementById('pg-'+name)?.classList.add('active');
+  if(name==='photos') renderPhotos();
+  if(name==='map') initMap();
+}
+function goBack(){
+  if(!stack.length) return;
+  document.getElementById('pg-'+stack.pop())?.classList.remove('active');
+}
+
+/* ============================================================
+   GPS
+============================================================ */
+function meterColor(acc){ return acc<10?'#00e5b0':acc<20?'#84cc16':acc<50?'#f59e0b':'#ef4444'; }
+
+function startGPS(){
+  if(!navigator.geolocation){ toast('ไม่รองรับ GPS','bad'); return; }
+  navigator.geolocation.watchPosition(pos=>{
+    const c={lat:pos.coords.latitude,lng:pos.coords.longitude,
+             alt:pos.coords.altitude,acc:pos.coords.accuracy,ts:Date.now()};
+    gps=c; gpsHist.push(c); if(gpsHist.length>12)gpsHist.shift();
+    bestGps = gpsHist.reduce((a,b)=>b.acc<a.acc?b:a, gpsHist[0]);
+
+    const pct=Math.max(0,Math.min(100,100-(c.acc/100)*100));
+    const mf=document.getElementById('meter-fill');
+    mf.style.width=pct+'%'; mf.style.background=meterColor(c.acc);
+
+    const hg=document.getElementById('hgps');
+    const a=Math.round(c.acc);
+    if(c.acc<GOOD){hg.className='';hg.textContent=`GPS ±${a}m ✓`;}
+    else if(c.acc<50){hg.className='warn';hg.textContent=`GPS ±${a}m`;}
+    else{hg.className='err';hg.textContent=`GPS อ่อน ±${a}m`;}
+
+    document.getElementById('olat').textContent=c.lat.toFixed(6)+'°';
+    document.getElementById('olng').textContent=c.lng.toFixed(6)+'°';
+    document.getElementById('oalt').textContent=c.alt?c.alt.toFixed(1)+' m':'--';
+    document.getElementById('oacc').textContent='±'+a+' m';
+    document.getElementById('lacv').textContent='±'+a+' m';
+    document.getElementById('bshut').classList.remove('ng');
+
+    if(lockPending && c.acc<=GOOD){ lockPending=false; document.getElementById('glock').classList.remove('show'); doCapture(); }
+  }, ()=>{
+    document.getElementById('hgps').className='err';
+    document.getElementById('hgps').textContent='ไม่มี GPS';
+    document.getElementById('bshut').classList.add('ng');
+    document.getElementById('olat').textContent='ไม่มีสัญญาณ';
+    document.getElementById('meter-fill').style.width='100%';
+    document.getElementById('meter-fill').style.background='#ef4444';
+  }, {enableHighAccuracy:true,maximumAge:0,timeout:20000});
+}
+
+/* ============================================================
+   CLOCK
+============================================================ */
+function startClock(){
+  const tick=()=>{
+    const d=new Date();
+    document.getElementById('hclock').textContent=fT(d);
+    document.getElementById('otime').textContent=fT(d);
+    document.getElementById('odate').textContent=fD(d);
+  };
+  tick(); setInterval(tick,1000);
+}
+
+/* ============================================================
+   CAMERA
+============================================================ */
+async function startCam(f){
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:f,width:{ideal:4096},height:{ideal:2160}},audio:false});
+    document.getElementById('video').srcObject=stream;
+    const tr=stream.getVideoTracks()[0];
+    const cp=tr.getCapabilities?tr.getCapabilities():{};
+    zCaps=cp.zoom||null; zLv=1;
+    document.getElementById('zlbl').textContent='1×';
+    applyZ();
+  }catch(e){ toast('ไม่สามารถเปิดกล้องได้','bad'); }
+}
+function flipCam(){ facing=facing==='environment'?'user':'environment'; startCam(facing); }
+
+function applyZ(){
+  if(zCaps) stream?.getVideoTracks()[0]?.applyConstraints({advanced:[{zoom:zLv}]}).catch(()=>{});
+  else{ const v=document.getElementById('video'); v.style.transform=`scale(${zLv})`; v.style.transformOrigin='center'; }
+  document.getElementById('zlbl').textContent=zLv.toFixed(1)+'×';
+}
+function zIn(){ zLv=Math.min(zLv+0.5,zCaps?zCaps.max||8:4); applyZ(); }
+function zOut(){ zLv=Math.max(zLv-0.5,1); applyZ(); }
+
+// pinch zoom
+let p0=null,z0=1;
+document.addEventListener('touchstart',e=>{ if(e.touches.length===2&&document.getElementById('vf').contains(e.target)){p0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);z0=zLv;} },{passive:true});
+document.addEventListener('touchmove',e=>{ if(e.touches.length===2&&p0){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);zLv=Math.max(1,Math.min(z0*(d/p0),4));applyZ();} },{passive:true});
+document.addEventListener('touchend',()=>{p0=null;},{passive:true});
+
+/* ============================================================
+   SHUTTER
+============================================================ */
+function pressShutter(){
+  if(!gps){ lockPending=true; document.getElementById('glock').classList.add('show'); return; }
+  if(gps.acc>GOOD){ lockPending=true; document.getElementById('glock').classList.add('show'); return; }
+  doCapture();
+}
+function skipLock(){ lockPending=false; document.getElementById('glock').classList.remove('show'); doCapture(); }
+
+/* ============================================================
+   CAPTURE — stamp ใหญ่
+============================================================ */
+function doCapture(){
+  const v=document.getElementById('video');
+  if(!v.videoWidth){ toast('กล้องยังไม่พร้อม','bad'); return; }
+  const bs=document.getElementById('bshut');
+  bs.classList.add('fl'); document.getElementById('flash').classList.add('on');
+  setTimeout(()=>{ document.getElementById('flash').classList.remove('on'); bs.classList.remove('fl'); },140);
+
+  const W=v.videoWidth,H=v.videoHeight;
+  const cv=document.getElementById('cvs'); cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
+  if(facing==='user'){ctx.translate(W,0);ctx.scale(-1,1);}
+  ctx.drawImage(v,0,0,W,H);
+  if(facing==='user')ctx.setTransform(1,0,0,1,0,0);
+
+  const ug=bestGps||gps;
+  const now=new Date();
+
+  // ===== STAMP — ขนาดใหญ่ 3.8% ของความกว้าง =====
+  const fSz=Math.round(W*0.038);
+  const lh=fSz*1.7, pd=fSz*0.9;
+
+  const lines=ug?[
+    {t:`LAT  ${ug.lat.toFixed(6)}°`,       c:'#ffffff'},
+    {t:`LNG  ${ug.lng.toFixed(6)}°`,       c:'#ffffff'},
+    {t:`ALT  ${ug.alt?ug.alt.toFixed(1)+' m':'--'}   ACC ±${Math.round(ug.acc)} m`, c:'#94a3b8'},
+    {t:`${fD(now)}  ${fT(now)}`,           c:'#e2e8f0'},
+    {t:`SURVEYCAM`,                         c:'#00e5b0'},
+  ]:[
+    {t:`[ไม่มีข้อมูล GPS]`,               c:'#f59e0b'},
+    {t:`${fD(now)}  ${fT(now)}`,           c:'#e2e8f0'},
+    {t:`SURVEYCAM`,                         c:'#00e5b0'},
+  ];
+
+  ctx.font=`bold ${fSz}px "Courier New",monospace`;
+  const tw=lines.reduce((a,l)=>Math.max(a,ctx.measureText(l.t).width),0);
+  const bh=lines.length*lh+pd*1.5;
+  const bx=pd*0.4, by=H-bh, bw=tw+pd*2.4, rr=fSz*0.4;
+
+  // กล่อง
+  ctx.fillStyle='rgba(8,12,18,0.82)';
+  ctx.beginPath();
+  ctx.moveTo(bx+rr,by); ctx.lineTo(bx+bw-rr,by);
+  ctx.arcTo(bx+bw,by,bx+bw,by+rr,rr); ctx.lineTo(bx+bw,by+bh);
+  ctx.lineTo(bx,by+bh); ctx.lineTo(bx,by+rr);
+  ctx.arcTo(bx,by,bx+rr,by,rr); ctx.closePath(); ctx.fill();
+  // เส้นสีซ้าย
+  ctx.fillStyle='#00e5b0'; ctx.fillRect(bx,by+rr,Math.max(3,fSz*0.09),bh-rr);
+
+  lines.forEach((l,i)=>{ ctx.fillStyle=l.c; ctx.fillText(l.t,bx+pd,by+pd*0.9+(i+1)*lh); });
+
+  const url=cv.toDataURL('image/jpeg',0.92);
+  photos.unshift({id:Date.now(),dataURL:url,
+    lat:ug?.lat??null,lng:ug?.lng??null,alt:ug?.alt??null,acc:ug?.acc??null,dt:now.toISOString()});
+  saveDB(); updCnt();
+  toast(ug?`✓ บันทึกแล้ว · GPS ±${Math.round(ug.acc)}m`:'✓ บันทึกแล้ว (ไม่มี GPS)','ok');
+}
+
+/* ============================================================
+   PHOTOS LIST
+============================================================ */
+function renderPhotos(){
+  const g=document.getElementById('pgrid');
+  if(!photos.length){ g.innerHTML='<div class="emp">📷<br><br>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>'; return; }
+  g.innerHTML=photos.map((p,i)=>{
+    const d=new Date(p.dt);
+    return `<div class="pc" onclick="openV(${i})">
+      <img src="${p.dataURL}" loading="lazy" alt="">
+      <div class="pm">
+        <div class="pdt">${fD(d)} ${fT(d)}</div>
+        <div class="pco">${p.lat?p.lat.toFixed(5)+', '+p.lng.toFixed(5):'ไม่มี GPS'}</div>
+      </div></div>`;
+  }).join('');
+}
+
+/* ============================================================
+   VIEWER
+============================================================ */
+function openV(i){
+  vIdx=i; const p=photos[i]; const d=new Date(p.dt);
+  document.getElementById('vimg').src=p.dataURL;
+  document.getElementById('vtit').textContent=`ภาพ ${i+1}/${photos.length}`;
+  document.getElementById('vilat').textContent=p.lat?p.lat.toFixed(7)+'°':'ไม่มีข้อมูล';
+  document.getElementById('vilng').textContent=p.lng?p.lng.toFixed(7)+'°':'ไม่มีข้อมูล';
+  document.getElementById('vialt').textContent=p.alt?p.alt.toFixed(1)+' m':'--';
+  document.getElementById('viacc').textContent=p.acc?'±'+Math.round(p.acc)+' m':'--';
+  document.getElementById('vitm').textContent=fT(d);
+  document.getElementById('vidt').textContent=fD(d);
+  goPg('viewer');
+}
+
+function saveGal(){
+  if(vIdx<0)return;
+  const p=photos[vIdx],d=new Date(p.dt);
+  const n=`survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
+  const a=document.createElement('a'); a.href=p.dataURL; a.download=n; a.click();
+  toast('บันทึก '+n,'ok');
+}
+
+/* ============================================================
+   เปิด Google Maps — ฟีเจอร์ใหม่
+============================================================ */
+function openGMaps(){
+  if(vIdx<0)return;
+  const p=photos[vIdx];
+  if(!p.lat){ toast('รูปนี้ไม่มีข้อมูล GPS','bad'); return; }
+
+  // URL สำหรับค้นหาใน Google Maps — เปิด Maps app ถ้ามี ไม่งั้นเปิด browser
+  const url=`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
+  window.open(url,'_blank');
+}
+
+// เปิด Maps จากพิกัดปัจจุบัน (ปุ่มใน nav)
+function openCurrentGMaps(){
+  if(!gps){ toast('ยังไม่มี GPS','bad'); return; }
+  const url=`https://www.google.com/maps/search/?api=1&query=${gps.lat},${gps.lng}`;
+  window.open(url,'_blank');
+}
+
+async function shareP(){
+  if(vIdx<0)return;
+  const p=photos[vIdx];
+  if(navigator.share&&navigator.canShare){
+    try{
+      const res=await fetch(p.dataURL); const blob=await res.blob();
+      const file=new File([blob],'survey.jpg',{type:'image/jpeg'});
+      if(navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'SurveyCAM'}); return; }
+    }catch(e){}
+  }
+  saveGal();
+}
+
+function delP(){
+  if(vIdx<0)return;
+  if(!confirm('ลบรูปนี้?'))return;
+  photos.splice(vIdx,1); saveDB(); updCnt(); goBack(); toast('ลบแล้ว');
+}
+
+/* ============================================================
+   MAP
+============================================================ */
+function initMap(){
+  const pts=photos.filter(p=>p.lat);
+  document.getElementById('mcount').textContent=pts.length;
+  if(lmap){lmap.remove();lmap=null;}
+  const ctr=pts.length?[pts[0].lat,pts[0].lng]:gps?[gps.lat,gps.lng]:[13.7563,100.5018];
+  lmap=L.map('lmap',{zoomControl:false}).setView(ctr,15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(lmap);
+  L.control.zoom({position:'topright'}).addTo(lmap);
+  const mk=i=>L.divIcon({
+    html:`<div style="background:#00e5b0;color:#000;font-size:9px;font-weight:700;font-family:monospace;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.6)"><span style="transform:rotate(45deg)">${i+1}</span></div>`,
+    className:'',iconSize:[26,26],iconAnchor:[13,26]
+  });
+  pts.forEach((p,i)=>{
+    const d=new Date(p.dt);
+    const gmUrl=`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
+    L.marker([p.lat,p.lng],{icon:mk(i)}).addTo(lmap).bindPopup(
+      `<div style="font-family:monospace;font-size:11px;min-width:180px;">
+        <img src="${p.dataURL}" style="width:100%;border-radius:4px;margin-bottom:6px;display:block;">
+        <b style="color:#00e5b0">ภาพที่ ${i+1}</b><br>
+        ${fD(d)} ${fT(d)}<br>
+        ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}<br>
+        ${p.acc?'±'+Math.round(p.acc)+'m':''}<br>
+        <a href="${gmUrl}" target="_blank" style="color:#60a5fa;font-size:11px;">🗺 เปิดใน Google Maps</a>
+      </div>`);
+  });
+  if(pts.length>1){
+    const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.6,dashArray:'4 6'}).addTo(lmap);
+    lmap.fitBounds(ln.getBounds(),{padding:[30,30]});
+  }
+  if(gps) L.circleMarker([gps.lat,gps.lng],{radius:9,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.5,weight:2}).addTo(lmap).bindPopup('ตำแหน่งปัจจุบัน');
+}
+
+/* ============================================================
+   CSV
+============================================================ */
+function doCSV(){
+  if(!photos.length){ toast('ยังไม่มีรูปภาพ','bad'); return; }
+  const rows=[['no','datetime_iso','date_th','time','lat','lng','altitude_m','accuracy_m','google_maps_url']];
+  photos.forEach((p,i)=>{
+    const d=new Date(p.dt);
+    const gmUrl=p.lat?`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`:'';
+    rows.push([i+1,p.dt,fD(d),fT(d),p.lat??'',p.lng??'',p.alt!=null?p.alt.toFixed(2):'',p.acc!=null?Math.round(p.acc):'',gmUrl]);
+  });
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`surveycam_${Date.now()}.csv`; a.click();
+  toast(`ส่งออก ${photos.length} รายการ พร้อมลิ้งค์ Maps`,'ok');
+}
+
+/* ============================================================
+   PWA INSTALL
+============================================================ */
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); dip=e;
+  setTimeout(()=>{ if(!localStorage.getItem('sc_nodip')){ document.getElementById('ibanner').classList.add('show'); document.getElementById('btinst').style.display='flex'; } },3000);
+});
+window.addEventListener('appinstalled',()=>{ document.getElementById('ibanner').classList.remove('show'); toast('ติดตั้งสำเร็จ! 🎉','ok'); });
+
+function trigInst(){
+  if(/iphone|ipad|ipod/i.test(navigator.userAgent)){ document.getElementById('iosguide').classList.add('show'); return; }
+  if(dip){ dip.prompt(); } else { toast('กด ⋮ → "Add to Home screen"','ok'); }
+}
+async function doInst(){
+  if(!dip){ trigInst(); return; }
+  dip.prompt();
+  const{outcome}=await dip.userChoice; dip=null;
+  document.getElementById('ibanner').classList.remove('show');
+  if(outcome==='accepted') toast('กำลังติดตั้ง...','ok');
+}
+function dimInst(){ document.getElementById('ibanner').classList.remove('show'); localStorage.setItem('sc_nodip','1'); }
+
+if(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!navigator.standalone){
+  setTimeout(()=>{
+    document.getElementById('btinst').style.display='flex';
+    if(!localStorage.getItem('sc_nodip')){
+      const b=document.getElementById('ibanner');
+      b.classList.add('show');
+      b.querySelector('.isub').textContent='เปิดใน Safari → Share → Add to Home Screen';
+      document.getElementById('binstall').textContent='📖 วิธีติดตั้ง';
+      document.getElementById('binstall').onclick=()=>{ b.classList.remove('show'); document.getElementById('iosguide').classList.add('show'); };
+    }
+  },3000);
+}
+
+/* ============================================================
+   SERVICE WORKER
+============================================================ */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(()=>console.log('SW ok')).catch(()=>{});
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+window.addEventListener('load',()=>{
+  document.getElementById('splash').style.display='none';
+  startCam('environment');
+  startGPS();
+  startClock();
+  updCnt();
+});
+</script>
+</body>
+</html>
