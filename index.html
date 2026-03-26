@@ -10,24 +10,21 @@
 <meta name="theme-color" content="#080c12">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>SurveyCAM</title>
+<title>SurveyCAM Pro</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 :root{
-  --bg:#080c12;--s1:#0e1420;--s2:#141c2e;
-  --accent:#00e5b0;--adim:rgba(0,229,176,.15);--aglow:rgba(0,229,176,.3);
-  --warn:#f59e0b;--danger:#ef4444;
-  --text:#eef2ff;--muted:#64748b;
-  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);
-  --font:'SF Mono','Fira Code','Courier New',monospace;
-  --r:12px;
-  --st:env(safe-area-inset-top,0px);
-  --sb:env(safe-area-inset-bottom,0px);
+  --bg:#080c12;--s1:#0e1420;--s2:#141c2e;--s3:#1c2640;
+  --ac:#00e5b0;--ad:rgba(0,229,176,.15);--ag:rgba(0,229,176,.3);
+  --bl:#3b82f6;--bld:rgba(59,130,246,.15);
+  --wn:#f59e0b;--dn:#ef4444;
+  --tx:#eef2ff;--mu:#64748b;
+  --br:rgba(255,255,255,.07);--br2:rgba(255,255,255,.13);
+  --fn:'SF Mono','Fira Code','Courier New',monospace;
+  --r:12px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
 }
-html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:100%;overflow:hidden;}
+html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%;overflow:hidden;}
 #app{display:flex;flex-direction:column;height:100dvh;position:relative;overflow:hidden;}
-
-/* PAGES */
 .page{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);
   transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:10;}
 .page.active{transform:translateX(0);}
@@ -37,205 +34,214 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:
 #vf{flex:1;position:relative;overflow:hidden;background:#000;}
 #video{width:100%;height:100%;object-fit:cover;display:block;}
 #vf::after{content:'';position:absolute;inset:0;pointer-events:none;
-  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.025) 2px,rgba(0,0,0,.025) 4px);z-index:2;}
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.02) 2px,rgba(0,0,0,.02) 4px);z-index:2;}
 
-/* GPS METER STRIP */
+/* GRID OVERLAY */
+#grid-overlay{position:absolute;inset:0;pointer-events:none;z-index:3;display:none;}
+#grid-overlay.show{display:block;}
+#grid-overlay svg{width:100%;height:100%;}
+
 #meter{position:absolute;top:0;left:0;right:0;height:3px;z-index:6;background:rgba(0,0,0,.3);}
-#meter-fill{height:100%;width:0;transition:width .5s,background .5s;}
+#mfill{height:100%;width:0;transition:width .5s,background .5s;}
 
-/* TOP HUD */
 #hud{position:absolute;top:0;left:0;right:0;z-index:5;
-  padding:calc(var(--st) + 10px) 14px 0;
-  background:linear-gradient(rgba(8,12,18,.82),transparent);pointer-events:none;}
-.hud-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;}
-.badge{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.2em;color:var(--accent);font-weight:700;}
-.badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite;}
+  padding:calc(var(--st)+10px) 14px 0;
+  background:linear-gradient(rgba(8,12,18,.85),transparent);pointer-events:none;}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;}
+.badge{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.2em;color:var(--ac);font-weight:700;}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:blink 2s infinite;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
 #hclock{font-size:13px;color:rgba(255,255,255,.9);letter-spacing:.08em;}
 #hgps{font-size:9px;letter-spacing:.1em;padding:3px 8px;border-radius:20px;
-  border:1px solid var(--aglow);background:var(--adim);color:var(--accent);}
-#hgps.warn{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.15);color:var(--warn);}
-#hgps.err{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:var(--danger);}
+  border:1px solid var(--ag);background:var(--ad);color:var(--ac);}
+#hgps.warn{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.15);color:var(--wn);}
+#hgps.err{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:var(--dn);}
 
-/* RETICLE */
 .ret{position:absolute;inset:10%;pointer-events:none;z-index:3;}
 .rc{position:absolute;width:22px;height:22px;}
-.rc::before,.rc::after{content:'';position:absolute;background:var(--accent);opacity:.8;}
+.rc::before,.rc::after{content:'';position:absolute;background:var(--ac);opacity:.8;}
 .rc.tl{top:0;left:0}.rc.tl::before{width:2px;height:100%;top:0;left:0}.rc.tl::after{height:2px;width:100%;top:0;left:0}
 .rc.tr{top:0;right:0}.rc.tr::before{width:2px;height:100%;top:0;right:0}.rc.tr::after{height:2px;width:100%;top:0;right:0}
 .rc.bl{bottom:0;left:0}.rc.bl::before{width:2px;height:100%;bottom:0;left:0}.rc.bl::after{height:2px;width:100%;bottom:0;left:0}
 .rc.br{bottom:0;right:0}.rc.br::before{width:2px;height:100%;bottom:0;right:0}.rc.br::after{height:2px;width:100%;bottom:0;right:0}
 
-/* ZOOM SIDE */
 #zctrl{position:absolute;right:12px;top:50%;transform:translateY(-50%);
   display:flex;flex-direction:column;align-items:center;gap:8px;z-index:5;}
-.zbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border2);
-  background:rgba(8,12,18,.75);color:var(--text);font-size:20px;cursor:pointer;
+.zbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--br2);
+  background:rgba(8,12,18,.75);color:var(--tx);font-size:20px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:all .15s;}
-.zbtn:active{background:var(--adim);border-color:var(--accent);}
-#zlbl{font-size:10px;color:var(--accent);background:rgba(8,12,18,.75);
-  padding:3px 7px;border-radius:6px;border:1px solid var(--adim);}
+.zbtn:active{background:var(--ad);border-color:var(--ac);}
+#zlbl{font-size:10px;color:var(--ac);background:rgba(8,12,18,.75);
+  padding:3px 7px;border-radius:6px;border:1px solid var(--ad);}
 
-/* GPS OVERLAY BOTTOM — ตัวใหญ่ */
+/* TIMER COUNTDOWN */
+#timer-display{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:20;font-size:72px;font-weight:700;color:#fff;
+  text-shadow:0 0 30px var(--ac);display:none;pointer-events:none;}
+
 #gbot{position:absolute;bottom:0;left:0;right:0;z-index:5;
   background:linear-gradient(transparent,rgba(8,12,18,.93));pointer-events:none;}
 #cstrip{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:10px 14px 6px;}
 .ci{display:flex;gap:7px;align-items:baseline;}
-.cl{color:var(--accent);font-size:9px;letter-spacing:.18em;min-width:28px;font-weight:700;}
+.cl{color:var(--ac);font-size:9px;letter-spacing:.18em;min-width:28px;font-weight:700;}
 .cv{color:#fff;font-size:14px;letter-spacing:.03em;font-weight:600;}
 #dstrip{display:flex;justify-content:space-between;padding:2px 14px 12px;
   font-size:13px;color:rgba(255,255,255,.88);letter-spacing:.06em;font-weight:600;}
 
-/* GPS LOCK */
 #glock{position:absolute;inset:0;z-index:20;background:rgba(8,12,18,.9);
   display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
 #glock.show{display:flex;}
-.lring{width:64px;height:64px;border-radius:50%;border:2px solid var(--border2);
-  border-top-color:var(--accent);animation:spin .9s linear infinite;}
+.lring{width:64px;height:64px;border-radius:50%;border:2px solid var(--br2);
+  border-top-color:var(--ac);animation:spin .9s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
-.ltxt{font-size:12px;color:var(--text);letter-spacing:.1em;text-align:center;line-height:1.9;}
-.lacc{font-size:22px;color:var(--accent);font-weight:700;}
-.lskip{margin-top:6px;padding:9px 22px;border-radius:20px;border:1px solid var(--border2);
-  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;cursor:pointer;}
+.ltxt{font-size:12px;color:var(--tx);letter-spacing:.1em;text-align:center;line-height:1.9;}
+.lacc{font-size:22px;color:var(--ac);font-weight:700;}
+.lskip{margin-top:6px;padding:9px 22px;border-radius:20px;border:1px solid var(--br2);
+  background:transparent;color:var(--mu);font-family:var(--fn);font-size:10px;cursor:pointer;}
 
-/* CONTROLS */
-#ctrl{background:var(--s1);border-top:1px solid var(--border);
+#ctrl{background:var(--s1);border-top:1px solid var(--br);
   padding:14px 20px calc(14px + var(--sb));
-  display:flex;align-items:center;justify-content:space-between;gap:16px;}
-#bgal{width:54px;height:54px;border-radius:var(--r);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;}
+#bgal{width:54px;height:54px;border-radius:var(--r);border:1px solid var(--br2);
   background:var(--s2);cursor:pointer;overflow:hidden;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;transition:border-color .2s;}
-#bgal:active{border-color:var(--accent);}
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;}
+#bgal:active{border-color:var(--ac);}
 #gthumb{width:100%;height:100%;object-fit:cover;display:none;}
-#gicon{color:var(--muted);font-size:22px;}
-#gcnt{position:absolute;top:4px;right:4px;background:var(--accent);color:#000;
+#gicon{color:var(--mu);font-size:22px;}
+#gcnt{position:absolute;top:4px;right:4px;background:var(--ac);color:#000;
   font-size:8px;font-weight:700;padding:1px 4px;border-radius:6px;display:none;}
-#bshut{width:74px;height:74px;border-radius:50%;border:3px solid var(--accent);
+#bshut{width:74px;height:74px;border-radius:50%;border:3px solid var(--ac);
   background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:all .15s;}
+  flex-shrink:0;transition:all .15s;position:relative;}
 #bshut:active{transform:scale(.92);}
-#sinr{width:60px;height:60px;border-radius:50%;background:var(--accent);transition:all .15s;}
+#sinr{width:60px;height:60px;border-radius:50%;background:var(--ac);transition:all .15s;}
 #bshut.fl #sinr{background:#fff;transform:scale(.8);}
-#bshut.ng{border-color:var(--warn);}#bshut.ng #sinr{background:var(--warn);}
-#bflip{width:54px;height:54px;border-radius:50%;border:1px solid var(--border2);
+#bshut.ng{border-color:var(--wn);}#bshut.ng #sinr{background:var(--wn);}
+#bset{width:54px;height:54px;border-radius:50%;border:1px solid var(--br2);
   background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;
-  color:var(--text);font-size:22px;flex-shrink:0;transition:transform .35s;}
-#bflip:active{transform:rotate(180deg);}
+  color:var(--tx);font-size:20px;flex-shrink:0;}
+#bset:active{border-color:var(--ac);}
 
-/* NAV */
-#nav{background:var(--s1);border-top:1px solid var(--border);
+#nav{background:var(--s1);border-top:1px solid var(--br);
   display:flex;gap:4px;padding:8px 12px;overflow-x:auto;scrollbar-width:none;}
 #nav::-webkit-scrollbar{display:none;}
 .ntab{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid transparent;
-  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;
+  background:transparent;color:var(--mu);font-family:var(--fn);font-size:10px;
   letter-spacing:.08em;cursor:pointer;transition:all .2s;}
-.ntab.on,.ntab:active{background:var(--adim);border-color:var(--aglow);color:var(--accent);}
+.ntab.on,.ntab:active{background:var(--ad);border-color:var(--ag);color:var(--ac);}
 
-/* PANEL HEADER */
+/* PANEL COMMON */
 .ph{display:flex;align-items:center;justify-content:space-between;
-  padding:calc(var(--st) + 14px) 16px 14px;border-bottom:1px solid var(--border);background:var(--s1);}
-.pt{font-size:13px;letter-spacing:.15em;color:var(--text);}
-.bk{padding:7px 14px;border-radius:20px;border:1px solid var(--border2);
-  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;cursor:pointer;}
-.bk:active{border-color:var(--accent);color:var(--accent);}
+  padding:calc(var(--st)+14px) 16px 14px;border-bottom:1px solid var(--br);background:var(--s1);}
+.pt{font-size:13px;letter-spacing:.15em;color:var(--tx);}
+.bk{padding:7px 14px;border-radius:20px;border:1px solid var(--br2);
+  background:transparent;color:var(--mu);font-family:var(--fn);font-size:10px;cursor:pointer;}
+.bk:active{border-color:var(--ac);color:var(--ac);}
+
+/* SETTINGS PANEL */
+#pg-settings{overflow-y:auto;}
+.set-body{flex:1;overflow-y:auto;padding:16px;}
+.set-sec{margin-bottom:20px;}
+.set-title{font-size:9px;color:var(--ac);letter-spacing:.2em;margin-bottom:10px;font-weight:700;}
+.set-row{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;background:var(--s2);border-radius:10px;margin-bottom:6px;
+  border:1px solid var(--br);}
+.set-lbl{font-size:11px;color:var(--tx);}
+.set-sub{font-size:9px;color:var(--mu);margin-top:2px;}
+.set-ctrl{display:flex;align-items:center;gap:8px;}
+.tog{width:42px;height:24px;border-radius:12px;background:var(--s3);
+  border:1px solid var(--br2);cursor:pointer;position:relative;transition:background .2s;}
+.tog.on{background:var(--ac);}
+.tog::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;
+  background:#fff;top:2px;left:2px;transition:left .2s;}
+.tog.on::after{left:20px;}
+.sel{background:var(--s3);border:1px solid var(--br2);color:var(--tx);
+  font-family:var(--fn);font-size:10px;padding:5px 8px;border-radius:8px;cursor:pointer;}
+.cache-info{font-size:10px;color:var(--mu);padding:8px 14px;}
 
 /* PHOTOS */
 #pgrid{flex:1;overflow-y:auto;padding:10px;
   display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;}
-.pc{background:var(--s2);border-radius:var(--r);border:1px solid var(--border);
+.pc{background:var(--s2);border-radius:var(--r);border:1px solid var(--br);
   overflow:hidden;cursor:pointer;transition:border-color .2s;}
-.pc:active{border-color:var(--accent);}
+.pc:active{border-color:var(--ac);}
 .pc img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;}
 .pm{padding:7px 9px;}
-.pdt{font-size:9px;color:var(--muted);line-height:1.4;}
-.pco{font-size:9px;color:var(--accent);margin-top:2px;}
+.pdt{font-size:9px;color:var(--mu);line-height:1.4;}
+.pco{font-size:9px;color:var(--ac);margin-top:2px;}
 .emp{grid-column:1/-1;text-align:center;padding:60px 20px;
-  color:var(--muted);font-size:11px;letter-spacing:.06em;line-height:2;}
+  color:var(--mu);font-size:11px;line-height:2;}
 
 /* VIEWER */
 #vwrap{flex:1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;}
 #vimg{max-width:100%;max-height:100%;object-fit:contain;}
-#vbot{background:var(--s1);border-top:1px solid var(--border);
-  padding:14px 16px calc(14px + var(--sb));}
+#vbot{background:var(--s1);border-top:1px solid var(--br);padding:14px 16px calc(14px + var(--sb));}
 .itbl{width:100%;font-size:11px;border-collapse:collapse;}
 .itbl td{padding:4px 0;}
-.itbl .lb{color:var(--accent);font-size:8px;letter-spacing:.15em;width:40px;}
-.itbl .vl{color:var(--text);}
-.arow{display:flex;gap:8px;margin-top:12px;}
-.ab{flex:1;padding:11px 8px;border-radius:10px;border:1px solid var(--border2);
-  background:var(--s2);color:var(--text);font-family:var(--font);font-size:10px;
-  cursor:pointer;text-align:center;letter-spacing:.05em;transition:all .15s;}
+.itbl .lb{color:var(--ac);font-size:8px;letter-spacing:.15em;width:40px;}
+.itbl .vl{color:var(--tx);}
+.arow{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;}
+.ab{flex:1;min-width:60px;padding:10px 6px;border-radius:10px;border:1px solid var(--br2);
+  background:var(--s2);color:var(--tx);font-family:var(--fn);font-size:10px;
+  cursor:pointer;text-align:center;transition:all .15s;}
 .ab:active{opacity:.7;}
-.ab.pr{background:var(--adim);border-color:var(--aglow);color:var(--accent);}
-.ab.gm{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.35);color:#60a5fa;}
-.ab.rd{border-color:rgba(239,68,68,.3);color:var(--danger);}
+.ab.pr{background:var(--ad);border-color:var(--ag);color:var(--ac);}
+.ab.gm{background:var(--bld);border-color:rgba(59,130,246,.35);color:#60a5fa;}
+.ab.rd{border-color:rgba(239,68,68,.3);color:var(--dn);}
+
+/* QR MODAL */
+#qr-modal{position:fixed;inset:0;z-index:800;background:rgba(8,12,18,.95);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+#qr-modal.show{display:flex;}
+#qr-canvas{border-radius:12px;}
+.qr-info{font-size:11px;color:var(--mu);text-align:center;letter-spacing:.05em;line-height:1.8;}
+.qr-close{padding:10px 28px;border-radius:20px;border:1px solid var(--br2);
+  background:transparent;color:var(--mu);font-family:var(--fn);font-size:10px;cursor:pointer;}
+
+/* PDF PROGRESS */
+#pdf-modal{position:fixed;inset:0;z-index:800;background:rgba(8,12,18,.95);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+#pdf-modal.show{display:flex;}
+.pdf-title{font-size:14px;color:var(--ac);letter-spacing:.1em;}
+.pdf-sub{font-size:11px;color:var(--mu);letter-spacing:.06em;}
+#pdf-prog-bar{width:240px;height:4px;background:var(--s3);border-radius:2px;overflow:hidden;}
+#pdf-prog-fill{height:100%;background:var(--ac);width:0%;transition:width .3s;}
 
 /* MAP */
 #mcon{flex:1;position:relative;overflow:hidden;}
 #lmap{width:100%;height:100%;}
 .mleg{position:absolute;bottom:12px;left:12px;z-index:1000;
-  background:rgba(8,12,18,.88);border:1px solid var(--border2);border-radius:10px;
-  padding:8px 12px;font-size:9px;color:var(--muted);letter-spacing:.06em;
+  background:rgba(8,12,18,.9);border:1px solid var(--br2);border-radius:10px;
+  padding:8px 12px;font-size:9px;color:var(--mu);
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
-.mleg b{color:var(--accent);}
-
-/* INSTALL BANNER */
-#ibanner{position:fixed;bottom:0;left:0;right:0;z-index:500;
-  background:var(--s1);border-top:2px solid var(--accent);
-  padding:14px 16px calc(14px + var(--sb));
-  display:none;flex-direction:column;gap:10px;
-  box-shadow:0 -8px 32px rgba(0,229,176,.15);}
-#ibanner.show{display:flex;}
-.itop{display:flex;align-items:center;gap:12px;}
-.iico{width:44px;height:44px;border-radius:10px;background:var(--adim);
-  border:1px solid var(--aglow);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
-.iinf .itit{font-size:13px;color:var(--text);font-weight:700;letter-spacing:.05em;}
-.iinf .isub{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5;}
-.ibtns{display:flex;gap:8px;}
-#binstall{flex:1;padding:11px;border-radius:10px;background:var(--accent);color:#000;
-  font-family:var(--font);font-size:11px;font-weight:700;border:none;cursor:pointer;letter-spacing:.08em;}
-#bdismiss{padding:11px 16px;border-radius:10px;border:1px solid var(--border2);
-  background:transparent;color:var(--muted);font-family:var(--font);font-size:10px;cursor:pointer;}
-
-/* iOS GUIDE */
-#iosguide{position:fixed;inset:0;z-index:600;background:rgba(8,12,18,.93);
-  display:none;flex-direction:column;align-items:center;justify-content:flex-end;
-  padding-bottom:calc(20px + var(--sb));}
-#iosguide.show{display:flex;}
-.iosc{background:var(--s2);border:1px solid var(--border2);border-radius:16px;
-  padding:20px;margin:0 16px;width:calc(100% - 32px);max-width:360px;}
-.iosc h3{font-size:13px;color:var(--accent);letter-spacing:.1em;margin-bottom:14px;}
-.iost{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;font-size:12px;line-height:1.6;}
-.iost .n{background:var(--adim);color:var(--accent);border-radius:50%;
-  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
-  font-size:10px;font-weight:700;flex-shrink:0;}
-.iarr{font-size:26px;margin-top:14px;animation:bounce .8s infinite;}
-@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
-#biosclose{margin-top:12px;width:100%;padding:11px;border-radius:10px;
-  border:1px solid var(--border2);background:transparent;
-  color:var(--muted);font-family:var(--font);font-size:10px;cursor:pointer;}
+.mleg b{color:var(--ac);}
+#mcache-btn{position:absolute;top:12px;right:12px;z-index:1000;
+  padding:8px 14px;border-radius:20px;border:1px solid var(--br2);
+  background:rgba(8,12,18,.85);color:var(--tx);font-family:var(--fn);font-size:10px;
+  cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+#mcache-btn:active{border-color:var(--ac);color:var(--ac);}
 
 #cvs{display:none;}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999;transition:opacity .06s;}
 #flash.on{opacity:.85;}
 #toast{position:fixed;bottom:130px;left:50%;transform:translateX(-50%);
-  background:rgba(8,12,18,.93);color:var(--text);padding:9px 20px;border-radius:24px;
-  font-size:11px;letter-spacing:.05em;border:1px solid var(--border2);opacity:0;transition:opacity .3s;
-  z-index:1001;white-space:nowrap;pointer-events:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+  background:rgba(8,12,18,.93);color:var(--tx);padding:9px 20px;border-radius:24px;
+  font-size:11px;letter-spacing:.05em;border:1px solid var(--br2);opacity:0;transition:opacity .3s;
+  z-index:1001;white-space:nowrap;pointer-events:none;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
 #toast.show{opacity:1;}
-#toast.ok{border-color:var(--aglow);color:var(--accent);}
-#toast.bad{border-color:rgba(239,68,68,.4);color:var(--danger);}
+#toast.ok{border-color:var(--ag);color:var(--ac);}
+#toast.bad{border-color:rgba(239,68,68,.4);color:var(--dn);}
 #splash{position:fixed;inset:0;background:var(--bg);z-index:9999;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
-.sring{width:48px;height:48px;border-radius:50%;border:2px solid var(--border2);
-  border-top-color:var(--accent);animation:spin .8s linear infinite;}
-.stxt{font-size:11px;color:var(--muted);letter-spacing:.1em;}
+.sring{width:48px;height:48px;border-radius:50%;border:2px solid var(--br2);
+  border-top-color:var(--ac);animation:spin .8s linear infinite;}
+.stxt{font-size:11px;color:var(--mu);letter-spacing:.1em;}
 </style>
 </head>
 <body>
-
-<div id="splash"><div class="sring"></div><div class="stxt">SURVEYCAM กำลังโหลด...</div></div>
+<div id="splash"><div class="sring"></div><div class="stxt">SURVEYCAM PRO</div></div>
 
 <div id="app">
 
@@ -244,10 +250,18 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:
     <div id="vf">
       <video id="video" autoplay muted playsinline></video>
       <canvas id="cvs"></canvas>
-      <div id="meter"><div id="meter-fill"></div></div>
+      <div id="grid-overlay">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+          <line x1="33" y1="0" x2="33" y2="100" stroke="rgba(255,255,255,0.25)" stroke-width="0.3"/>
+          <line x1="66" y1="0" x2="66" y2="100" stroke="rgba(255,255,255,0.25)" stroke-width="0.3"/>
+          <line x1="0" y1="33" x2="100" y2="33" stroke="rgba(255,255,255,0.25)" stroke-width="0.3"/>
+          <line x1="0" y1="66" x2="100" y2="66" stroke="rgba(255,255,255,0.25)" stroke-width="0.3"/>
+        </svg>
+      </div>
+      <div id="meter"><div id="mfill"></div></div>
       <div id="hud">
-        <div class="hud-row">
-          <div class="badge"><span class="dot"></span>SURVEYCAM</div>
+        <div class="hrow">
+          <div class="badge"><span class="dot"></span>SURVEYCAM PRO</div>
           <div id="hgps" class="warn">GPS...</div>
           <div id="hclock">--:--:--</div>
         </div>
@@ -261,11 +275,12 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:
         <div id="zlbl">1×</div>
         <button class="zbtn" onclick="zOut()">−</button>
       </div>
+      <div id="timer-display" id="timerDisp">3</div>
       <div id="glock">
         <div class="lring"></div>
         <div class="ltxt">กำลังล็อก GPS<br>รอสัญญาณแม่นยำ</div>
         <div class="lacc" id="lacv">-- m</div>
-        <button class="lskip" onclick="skipLock()">ถ่ายทันที (ข้ามรอ GPS)</button>
+        <button class="lskip" onclick="skipLock()">ถ่ายทันที</button>
       </div>
       <div id="gbot">
         <div id="cstrip">
@@ -282,14 +297,99 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:
         <img id="gthumb" alt=""><span id="gicon">⊞</span><span id="gcnt"></span>
       </button>
       <button id="bshut" onclick="pressShutter()"><div id="sinr"></div></button>
-      <button id="bflip" onclick="flipCam()">⟳</button>
+      <button id="bset" onclick="goPg('settings')">⚙</button>
     </div>
     <div id="nav">
       <button class="ntab on">📷 กล้อง</button>
       <button class="ntab" onclick="goPg('photos')">🗂 รูป <span id="ncount">0</span></button>
       <button class="ntab" onclick="goPg('map')">🗺 แผนที่</button>
-      <button class="ntab" onclick="doCSV()">📊 CSV</button>
-      <button class="ntab" id="btinst" onclick="trigInst()" style="display:none">⬇ ติดตั้ง</button>
+      <button class="ntab" onclick="genPDF()">📊 PDF</button>
+      <button class="ntab" onclick="doCSV()">📋 CSV</button>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="pg-settings" class="page">
+    <div class="ph"><span class="pt">⚙ ตั้งค่า</span><button class="bk" onclick="goBack()">← กลับ</button></div>
+    <div class="set-body">
+      <div class="set-sec">
+        <div class="set-title">กล้อง</div>
+        <div class="set-row">
+          <div><div class="set-lbl">Grid ช่วยจัดองค์ประกอบ</div><div class="set-sub">เส้นแบ่ง 3×3</div></div>
+          <div class="tog" id="tog-grid" onclick="togSetting('grid')"></div>
+        </div>
+        <div class="set-row">
+          <div><div class="set-lbl">Self-timer</div><div class="set-sub">นับถอยหลังก่อนถ่าย</div></div>
+          <div class="set-ctrl">
+            <select class="sel" id="sel-timer" onchange="saveSetting('timer',this.value)">
+              <option value="0">ปิด</option>
+              <option value="3">3 วินาที</option>
+              <option value="5">5 วินาที</option>
+              <option value="10">10 วินาที</option>
+            </select>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><div class="set-lbl">ความละเอียดภาพ</div><div class="set-sub">สูงกว่า = ไฟล์ใหญ่กว่า</div></div>
+          <div class="set-ctrl">
+            <select class="sel" id="sel-res" onchange="saveSetting('res',this.value);restartCam()">
+              <option value="4k">4K (สูงสุด)</option>
+              <option value="fhd">FHD 1080p</option>
+              <option value="hd">HD 720p</option>
+            </select>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><div class="set-lbl">GPS threshold แม่นยำ</div><div class="set-sub">รอจนถึงค่านี้ก่อนถ่าย</div></div>
+          <div class="set-ctrl">
+            <select class="sel" id="sel-gps" onchange="saveSetting('gpsThresh',this.value)">
+              <option value="5">±5m (แม่นมาก)</option>
+              <option value="10">±10m</option>
+              <option value="15" selected>±15m (แนะนำ)</option>
+              <option value="30">±30m</option>
+              <option value="999">ไม่รอ</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-sec">
+        <div class="set-title">stamp บนรูป</div>
+        <div class="set-row">
+          <div><div class="set-lbl">แสดง QR Code บนรูป</div><div class="set-sub">สแกนแล้วเปิด Google Maps</div></div>
+          <div class="tog" id="tog-qr" onclick="togSetting('qr')"></div>
+        </div>
+        <div class="set-row">
+          <div><div class="set-lbl">ชื่อโครงการ</div><div class="set-sub">แสดงบน stamp</div></div>
+          <div class="set-ctrl">
+            <input type="text" id="inp-project" placeholder="โครงการ..." 
+              style="background:var(--s3);border:1px solid var(--br2);color:var(--tx);
+              font-family:var(--fn);font-size:10px;padding:5px 8px;border-radius:8px;width:120px;"
+              onchange="saveSetting('project',this.value)">
+          </div>
+        </div>
+      </div>
+
+      <div class="set-sec">
+        <div class="set-title">แผนที่ offline</div>
+        <div class="set-row">
+          <div><div class="set-lbl">Cache แผนที่ตำแหน่งปัจจุบัน</div><div class="set-sub">บันทึกไว้ใช้ตอนไม่มีเน็ต</div></div>
+          <button onclick="cacheMapArea()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--ag);
+            background:var(--ad);color:var(--ac);font-family:var(--fn);font-size:10px;cursor:pointer;">
+            ⬇ Cache
+          </button>
+        </div>
+        <div class="cache-info" id="cache-info">กำลังตรวจสอบ cache...</div>
+      </div>
+
+      <div class="set-sec">
+        <div class="set-title">ข้อมูล</div>
+        <div class="set-row">
+          <div><div class="set-lbl">ลบรูปทั้งหมด</div><div class="set-sub" id="photo-count-info">-- รูป</div></div>
+          <button onclick="clearAll()" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);
+            background:transparent;color:var(--dn);font-family:var(--fn);font-size:10px;cursor:pointer;">ลบทั้งหมด</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -314,10 +414,12 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:
         <tr><td class="lb">ACC</td><td class="vl" id="viacc">--</td></tr>
         <tr><td class="lb">เวลา</td><td class="vl" id="vitm">--</td></tr>
         <tr><td class="lb">วันที่</td><td class="vl" id="vidt">--</td></tr>
+        <tr><td class="lb">โครงการ</td><td class="vl" id="viproj">--</td></tr>
       </table>
       <div class="arow">
         <button class="ab pr" onclick="saveGal()">⬇ บันทึก</button>
-        <button class="ab gm" onclick="openGMaps()">🗺 Maps</button>
+        <button class="ab" onclick="showQR()">▦ QR</button>
+        <button class="ab gm" onclick="openGM()">🗺 Maps</button>
         <button class="ab" onclick="shareP()">↗ แชร์</button>
         <button class="ab rd" onclick="delP()">✕</button>
       </div>
@@ -326,40 +428,28 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:
 
   <!-- MAP -->
   <div id="pg-map" class="page">
-    <div class="ph"><span class="pt">แผนที่ตำแหน่งรูป</span><button class="bk" onclick="goBack()">← กลับ</button></div>
+    <div class="ph"><span class="pt">แผนที่สำรวจ</span><button class="bk" onclick="goBack()">← กลับ</button></div>
     <div id="mcon">
       <div id="lmap"></div>
-      <div class="mleg"><b id="mcount">0</b> จุดสำรวจ · แตะหมุดเพื่อดูรายละเอียด</div>
+      <button id="mcache-btn" onclick="cacheCurrentView()">⬇ Cache พื้นที่นี้</button>
+      <div class="mleg"><b id="mcount">0</b> จุด · <span id="offline-status">online</span></div>
     </div>
   </div>
 
 </div>
 
-<!-- INSTALL BANNER -->
-<div id="ibanner">
-  <div class="itop">
-    <div class="iico">📷</div>
-    <div class="iinf">
-      <div class="itit">ติดตั้ง SurveyCAM</div>
-      <div class="isub">ใช้งานแบบ app ได้เลย · ทำงาน offline<br>ไม่ต้องเปิด browser ทุกครั้ง</div>
-    </div>
-  </div>
-  <div class="ibtns">
-    <button id="binstall" onclick="doInst()">⬇ ติดตั้งเลย</button>
-    <button id="bdismiss" onclick="dimInst()">ไว้ทีหลัง</button>
-  </div>
+<!-- QR MODAL -->
+<div id="qr-modal">
+  <canvas id="qr-canvas" width="220" height="220"></canvas>
+  <div class="qr-info" id="qr-info"></div>
+  <button class="qr-close" onclick="document.getElementById('qr-modal').classList.remove('show')">ปิด</button>
 </div>
 
-<!-- iOS GUIDE -->
-<div id="iosguide" onclick="this.classList.remove('show')">
-  <div class="iosc" onclick="event.stopPropagation()">
-    <h3>📱 ติดตั้งบน iPhone / iPad</h3>
-    <div class="iost"><div class="n">1</div><div>กดปุ่ม <b style="color:var(--accent)">แชร์ (□↑)</b> ที่แถบล่าง Safari</div></div>
-    <div class="iost"><div class="n">2</div><div>เลื่อนลงแล้วกด <b style="color:var(--accent)">"Add to Home Screen"</b></div></div>
-    <div class="iost"><div class="n">3</div><div>กด <b style="color:var(--accent)">"Add"</b> มุมขวาบน — เสร็จแล้ว!</div></div>
-    <button id="biosclose" onclick="document.getElementById('iosguide').classList.remove('show')">ปิด</button>
-  </div>
-  <div class="iarr">↓</div>
+<!-- PDF PROGRESS -->
+<div id="pdf-modal">
+  <div class="pdf-title">📊 กำลังสร้าง PDF...</div>
+  <div class="pdf-sub" id="pdf-status">กำลังเตรียมข้อมูล</div>
+  <div id="pdf-prog-bar"><div id="pdf-prog-fill"></div></div>
 </div>
 
 <div id="flash"></div>
@@ -368,168 +458,210 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--font);height:
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* ============================================================
-   STATE
-============================================================ */
-const KEY = 'scam4';
+/* ================================================================
+   STATE & SETTINGS
+================================================================ */
+const KEY = 'scam5';
+const SETKEY = 'scam5_set';
 let photos = [], gps = null, bestGps = null, gpsHist = [];
 let facing = 'environment', stream = null, zLv = 1, zCaps = null;
 let stack = [], vIdx = -1, lmap = null;
-let dip = null, lockPending = false;
-const GOOD = 15; // GPS ±15m ถือว่าแม่น
+let timerRunning = false, lockPending = false;
 
-try { photos = JSON.parse(localStorage.getItem(KEY)||'[]'); } catch(e) { photos=[]; }
+let cfg = { grid:false, timer:0, res:'4k', gpsThresh:15, qr:false, project:'' };
+try { cfg = {...cfg, ...JSON.parse(localStorage.getItem(SETKEY)||'{}')}; } catch(e){}
+try { photos = JSON.parse(localStorage.getItem(KEY)||'[]'); } catch(e){ photos=[]; }
 
-/* ============================================================
+const resMap = {
+  '4k': {width:{ideal:4096},height:{ideal:2160}},
+  'fhd':{width:{ideal:1920},height:{ideal:1080}},
+  'hd': {width:{ideal:1280},height:{ideal:720}}
+};
+
+/* ================================================================
    UTILS
-============================================================ */
-const p2 = n => String(n).padStart(2,'0');
-const thY = y => y+543;
-const fD = d => `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${thY(d.getFullYear())}`;
-const fT = d => `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+================================================================ */
+const p2=n=>String(n).padStart(2,'0');
+const thY=y=>y+543;
+const fD=d=>`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${thY(d.getFullYear())}`;
+const fT=d=>`${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
 
-function toast(msg, type=''){
+function toast(msg,type=''){
   const t=document.getElementById('toast');
   t.textContent=msg; t.className='show'+(type?' '+type:'');
   clearTimeout(t._t); t._t=setTimeout(()=>t.className='',2800);
 }
-
 function saveDB(){
-  try{ localStorage.setItem(KEY,JSON.stringify(photos)); }
-  catch(e){ while(photos.length>80)photos.pop(); try{localStorage.setItem(KEY,JSON.stringify(photos));}catch(ee){} }
+  try{localStorage.setItem(KEY,JSON.stringify(photos));}
+  catch(e){while(photos.length>80)photos.pop();try{localStorage.setItem(KEY,JSON.stringify(photos));}catch(ee){}}
 }
-
+function saveSetting(k,v){ cfg[k]=v; localStorage.setItem(SETKEY,JSON.stringify(cfg)); }
+function togSetting(k){
+  cfg[k]=!cfg[k]; saveSetting(k,cfg[k]);
+  document.getElementById('tog-'+k).classList.toggle('on',cfg[k]);
+  if(k==='grid') document.getElementById('grid-overlay').classList.toggle('show',cfg[k]);
+}
 function updCnt(){
   const n=photos.length;
   document.getElementById('ncount').textContent=n;
   const c=document.getElementById('gcnt');
   if(n>0){c.style.display='block';c.textContent=n;}else c.style.display='none';
-  if(n>0){
-    document.getElementById('gthumb').src=photos[0].dataURL;
-    document.getElementById('gthumb').style.display='block';
-    document.getElementById('gicon').style.display='none';
-  }
+  if(n>0){document.getElementById('gthumb').src=photos[0].dataURL;document.getElementById('gthumb').style.display='block';document.getElementById('gicon').style.display='none';}
+  const pi=document.getElementById('photo-count-info');
+  if(pi) pi.textContent=n+' รูป';
+}
+function loadSettings(){
+  document.getElementById('tog-grid').classList.toggle('on',cfg.grid);
+  document.getElementById('tog-qr').classList.toggle('on',cfg.qr);
+  document.getElementById('sel-timer').value=cfg.timer;
+  document.getElementById('sel-res').value=cfg.res;
+  document.getElementById('sel-gps').value=cfg.gpsThresh;
+  document.getElementById('inp-project').value=cfg.project||'';
+  if(cfg.grid) document.getElementById('grid-overlay').classList.add('show');
 }
 
-/* ============================================================
+/* ================================================================
    PAGE NAV
-============================================================ */
+================================================================ */
 function goPg(name){
   stack.push(name);
   document.getElementById('pg-'+name)?.classList.add('active');
   if(name==='photos') renderPhotos();
   if(name==='map') initMap();
+  if(name==='settings') updateCacheInfo();
 }
 function goBack(){
   if(!stack.length) return;
   document.getElementById('pg-'+stack.pop())?.classList.remove('active');
 }
 
-/* ============================================================
+/* ================================================================
    GPS
-============================================================ */
-function meterColor(acc){ return acc<10?'#00e5b0':acc<20?'#84cc16':acc<50?'#f59e0b':'#ef4444'; }
-
+================================================================ */
 function startGPS(){
   if(!navigator.geolocation){ toast('ไม่รองรับ GPS','bad'); return; }
   navigator.geolocation.watchPosition(pos=>{
-    const c={lat:pos.coords.latitude,lng:pos.coords.longitude,
-             alt:pos.coords.altitude,acc:pos.coords.accuracy,ts:Date.now()};
+    const c={lat:pos.coords.latitude,lng:pos.coords.longitude,alt:pos.coords.altitude,acc:pos.coords.accuracy,ts:Date.now()};
     gps=c; gpsHist.push(c); if(gpsHist.length>12)gpsHist.shift();
-    bestGps = gpsHist.reduce((a,b)=>b.acc<a.acc?b:a, gpsHist[0]);
-
+    bestGps=gpsHist.reduce((a,b)=>b.acc<a.acc?b:a,gpsHist[0]);
     const pct=Math.max(0,Math.min(100,100-(c.acc/100)*100));
-    const mf=document.getElementById('meter-fill');
-    mf.style.width=pct+'%'; mf.style.background=meterColor(c.acc);
-
-    const hg=document.getElementById('hgps');
-    const a=Math.round(c.acc);
-    if(c.acc<GOOD){hg.className='';hg.textContent=`GPS ±${a}m ✓`;}
+    const mf=document.getElementById('mfill');
+    mf.style.width=pct+'%';
+    mf.style.background=c.acc<10?'#00e5b0':c.acc<20?'#84cc16':c.acc<50?'#f59e0b':'#ef4444';
+    const hg=document.getElementById('hgps'),a=Math.round(c.acc);
+    if(c.acc<cfg.gpsThresh){hg.className='';hg.textContent=`GPS ±${a}m ✓`;}
     else if(c.acc<50){hg.className='warn';hg.textContent=`GPS ±${a}m`;}
-    else{hg.className='err';hg.textContent=`GPS อ่อน ±${a}m`;}
-
+    else{hg.className='err';hg.textContent=`GPS อ่อน`;}
     document.getElementById('olat').textContent=c.lat.toFixed(6)+'°';
     document.getElementById('olng').textContent=c.lng.toFixed(6)+'°';
     document.getElementById('oalt').textContent=c.alt?c.alt.toFixed(1)+' m':'--';
     document.getElementById('oacc').textContent='±'+a+' m';
     document.getElementById('lacv').textContent='±'+a+' m';
     document.getElementById('bshut').classList.remove('ng');
-
-    if(lockPending && c.acc<=GOOD){ lockPending=false; document.getElementById('glock').classList.remove('show'); doCapture(); }
-  }, ()=>{
-    document.getElementById('hgps').className='err';
-    document.getElementById('hgps').textContent='ไม่มี GPS';
+    if(lockPending&&c.acc<=cfg.gpsThresh){lockPending=false;document.getElementById('glock').classList.remove('show');startTimerOrCapture();}
+  },()=>{
+    document.getElementById('hgps').className='err';document.getElementById('hgps').textContent='ไม่มี GPS';
     document.getElementById('bshut').classList.add('ng');
-    document.getElementById('olat').textContent='ไม่มีสัญญาณ';
-    document.getElementById('meter-fill').style.width='100%';
-    document.getElementById('meter-fill').style.background='#ef4444';
-  }, {enableHighAccuracy:true,maximumAge:0,timeout:20000});
+    document.getElementById('mfill').style.width='100%';document.getElementById('mfill').style.background='#ef4444';
+  },{enableHighAccuracy:true,maximumAge:0,timeout:20000});
 }
 
-/* ============================================================
+/* ================================================================
    CLOCK
-============================================================ */
+================================================================ */
 function startClock(){
-  const tick=()=>{
-    const d=new Date();
-    document.getElementById('hclock').textContent=fT(d);
-    document.getElementById('otime').textContent=fT(d);
-    document.getElementById('odate').textContent=fD(d);
-  };
+  const tick=()=>{const d=new Date();document.getElementById('hclock').textContent=fT(d);document.getElementById('otime').textContent=fT(d);document.getElementById('odate').textContent=fD(d);};
   tick(); setInterval(tick,1000);
 }
 
-/* ============================================================
+/* ================================================================
    CAMERA
-============================================================ */
+================================================================ */
 async function startCam(f){
   if(stream)stream.getTracks().forEach(t=>t.stop());
   try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:f,width:{ideal:4096},height:{ideal:2160}},audio:false});
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:f,...resMap[cfg.res]},audio:false});
     document.getElementById('video').srcObject=stream;
     const tr=stream.getVideoTracks()[0];
     const cp=tr.getCapabilities?tr.getCapabilities():{};
-    zCaps=cp.zoom||null; zLv=1;
-    document.getElementById('zlbl').textContent='1×';
-    applyZ();
-  }catch(e){ toast('ไม่สามารถเปิดกล้องได้','bad'); }
+    zCaps=cp.zoom||null; zLv=1; document.getElementById('zlbl').textContent='1×'; applyZ();
+  }catch(e){toast('ไม่สามารถเปิดกล้องได้','bad');}
 }
-function flipCam(){ facing=facing==='environment'?'user':'environment'; startCam(facing); }
-
+function restartCam(){ startCam(facing); }
 function applyZ(){
-  if(zCaps) stream?.getVideoTracks()[0]?.applyConstraints({advanced:[{zoom:zLv}]}).catch(()=>{});
-  else{ const v=document.getElementById('video'); v.style.transform=`scale(${zLv})`; v.style.transformOrigin='center'; }
+  if(zCaps)stream?.getVideoTracks()[0]?.applyConstraints({advanced:[{zoom:zLv}]}).catch(()=>{});
+  else{const v=document.getElementById('video');v.style.transform=`scale(${zLv})`;v.style.transformOrigin='center';}
   document.getElementById('zlbl').textContent=zLv.toFixed(1)+'×';
 }
-function zIn(){ zLv=Math.min(zLv+0.5,zCaps?zCaps.max||8:4); applyZ(); }
-function zOut(){ zLv=Math.max(zLv-0.5,1); applyZ(); }
-
-// pinch zoom
+function zIn(){zLv=Math.min(zLv+0.5,zCaps?zCaps.max||8:4);applyZ();}
+function zOut(){zLv=Math.max(zLv-0.5,1);applyZ();}
 let p0=null,z0=1;
-document.addEventListener('touchstart',e=>{ if(e.touches.length===2&&document.getElementById('vf').contains(e.target)){p0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);z0=zLv;} },{passive:true});
-document.addEventListener('touchmove',e=>{ if(e.touches.length===2&&p0){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);zLv=Math.max(1,Math.min(z0*(d/p0),4));applyZ();} },{passive:true});
+document.addEventListener('touchstart',e=>{if(e.touches.length===2&&document.getElementById('vf').contains(e.target)){p0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);z0=zLv;}},{passive:true});
+document.addEventListener('touchmove',e=>{if(e.touches.length===2&&p0){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);zLv=Math.max(1,Math.min(z0*(d/p0),4));applyZ();}},{passive:true});
 document.addEventListener('touchend',()=>{p0=null;},{passive:true});
 
-/* ============================================================
-   SHUTTER
-============================================================ */
+/* ================================================================
+   SHUTTER + TIMER
+================================================================ */
 function pressShutter(){
-  if(!gps){ lockPending=true; document.getElementById('glock').classList.add('show'); return; }
-  if(gps.acc>GOOD){ lockPending=true; document.getElementById('glock').classList.add('show'); return; }
-  doCapture();
+  if(timerRunning) return;
+  if(!gps){lockPending=true;document.getElementById('glock').classList.add('show');return;}
+  if(gps.acc>cfg.gpsThresh){lockPending=true;document.getElementById('glock').classList.add('show');return;}
+  startTimerOrCapture();
 }
-function skipLock(){ lockPending=false; document.getElementById('glock').classList.remove('show'); doCapture(); }
+function skipLock(){lockPending=false;document.getElementById('glock').classList.remove('show');startTimerOrCapture();}
 
-/* ============================================================
-   CAPTURE — stamp ใหญ่
-============================================================ */
+function startTimerOrCapture(){
+  const sec=parseInt(cfg.timer)||0;
+  if(sec===0){doCapture();return;}
+  timerRunning=true;
+  const td=document.getElementById('timer-display');
+  td.style.display='block'; td.textContent=sec;
+  let remaining=sec;
+  const iv=setInterval(()=>{
+    remaining--;
+    if(remaining<=0){clearInterval(iv);td.style.display='none';timerRunning=false;doCapture();}
+    else td.textContent=remaining;
+  },1000);
+}
+
+/* ================================================================
+   QR CODE GENERATOR (ไม่ใช้ library ภายนอก)
+================================================================ */
+function genQRData(text){
+  // ใช้ QR code library จาก CDN
+  return text;
+}
+
+// วาด QR Code บน canvas โดยใช้ qrcode.js
+function drawQR(canvas, text, size=220){
+  // Simple QR placeholder — URL จะแสดงเป็น text ก่อน
+  // จะถูกแทนที่โดย library
+  const ctx=canvas.getContext('2d');
+  canvas.width=size; canvas.height=size;
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size);
+  ctx.fillStyle='#000'; ctx.font=`bold 11px monospace`;
+  ctx.textAlign='center';
+  // wrapping text
+  const words=text.split('');
+  let line='',y=30,maxW=size-20;
+  ctx.fillText('QR CODE',size/2,y); y+=20;
+  ctx.font='9px monospace';
+  for(let i=0;i<text.length;i+=20){
+    ctx.fillText(text.slice(i,i+20),size/2,y); y+=14;
+    if(y>size-10) break;
+  }
+}
+
+/* ================================================================
+   CAPTURE
+================================================================ */
 function doCapture(){
   const v=document.getElementById('video');
-  if(!v.videoWidth){ toast('กล้องยังไม่พร้อม','bad'); return; }
+  if(!v.videoWidth){toast('กล้องยังไม่พร้อม','bad');return;}
   const bs=document.getElementById('bshut');
   bs.classList.add('fl'); document.getElementById('flash').classList.add('on');
-  setTimeout(()=>{ document.getElementById('flash').classList.remove('on'); bs.classList.remove('fl'); },140);
+  setTimeout(()=>{document.getElementById('flash').classList.remove('on');bs.classList.remove('fl');},140);
 
   const W=v.videoWidth,H=v.videoHeight;
   const cv=document.getElementById('cvs'); cv.width=W; cv.height=H;
@@ -540,67 +672,88 @@ function doCapture(){
 
   const ug=bestGps||gps;
   const now=new Date();
-
-  // ===== STAMP — ขนาดใหญ่ 3.8% ของความกว้าง =====
   const fSz=Math.round(W*0.038);
   const lh=fSz*1.7, pd=fSz*0.9;
 
+  const proj=cfg.project?cfg.project:'SURVEYCAM PRO';
   const lines=ug?[
-    {t:`LAT  ${ug.lat.toFixed(6)}°`,       c:'#ffffff'},
-    {t:`LNG  ${ug.lng.toFixed(6)}°`,       c:'#ffffff'},
-    {t:`ALT  ${ug.alt?ug.alt.toFixed(1)+' m':'--'}   ACC ±${Math.round(ug.acc)} m`, c:'#94a3b8'},
-    {t:`${fD(now)}  ${fT(now)}`,           c:'#e2e8f0'},
-    {t:`SURVEYCAM`,                         c:'#00e5b0'},
+    {t:`LAT  ${ug.lat.toFixed(6)}°`,c:'#ffffff'},
+    {t:`LNG  ${ug.lng.toFixed(6)}°`,c:'#ffffff'},
+    {t:`ALT  ${ug.alt?ug.alt.toFixed(1)+' m':'--'}   ACC ±${Math.round(ug.acc)} m`,c:'#94a3b8'},
+    {t:`${fD(now)}  ${fT(now)}`,c:'#e2e8f0'},
+    {t:proj,c:'#00e5b0'},
   ]:[
-    {t:`[ไม่มีข้อมูล GPS]`,               c:'#f59e0b'},
-    {t:`${fD(now)}  ${fT(now)}`,           c:'#e2e8f0'},
-    {t:`SURVEYCAM`,                         c:'#00e5b0'},
+    {t:`[ไม่มีข้อมูล GPS]`,c:'#f59e0b'},
+    {t:`${fD(now)}  ${fT(now)}`,c:'#e2e8f0'},
+    {t:proj,c:'#00e5b0'},
   ];
 
   ctx.font=`bold ${fSz}px "Courier New",monospace`;
   const tw=lines.reduce((a,l)=>Math.max(a,ctx.measureText(l.t).width),0);
-  const bh=lines.length*lh+pd*1.5;
-  const bx=pd*0.4, by=H-bh, bw=tw+pd*2.4, rr=fSz*0.4;
 
-  // กล่อง
+  // ถ้าเปิด QR — เพิ่มพื้นที่ขวา
+  const qrSz=cfg.qr&&ug?Math.round(fSz*4.5):0;
+  const bh=lines.length*lh+pd*1.5;
+  const bx=pd*0.4, by=H-bh, bw=tw+pd*2.4+(qrSz>0?qrSz+pd:0), rr=fSz*0.4;
+
   ctx.fillStyle='rgba(8,12,18,0.82)';
   ctx.beginPath();
   ctx.moveTo(bx+rr,by); ctx.lineTo(bx+bw-rr,by);
   ctx.arcTo(bx+bw,by,bx+bw,by+rr,rr); ctx.lineTo(bx+bw,by+bh);
   ctx.lineTo(bx,by+bh); ctx.lineTo(bx,by+rr);
   ctx.arcTo(bx,by,bx+rr,by,rr); ctx.closePath(); ctx.fill();
-  // เส้นสีซ้าย
   ctx.fillStyle='#00e5b0'; ctx.fillRect(bx,by+rr,Math.max(3,fSz*0.09),bh-rr);
 
-  lines.forEach((l,i)=>{ ctx.fillStyle=l.c; ctx.fillText(l.t,bx+pd,by+pd*0.9+(i+1)*lh); });
+  lines.forEach((l,i)=>{ctx.fillStyle=l.c;ctx.fillText(l.t,bx+pd,by+pd*0.9+(i+1)*lh);});
+
+  // วาด QR Code ถ้าเปิดใช้
+  if(cfg.qr&&ug){
+    const qUrl=`https://maps.google.com/?q=${ug.lat},${ug.lng}`;
+    const qcv=document.createElement('canvas');
+    if(window.QRCode){
+      // ใช้ library ถ้ามี
+      const qr=new QRCode(document.createElement('div'),{text:qUrl,width:qrSz,height:qrSz,correctLevel:QRCode.CorrectLevel.M});
+      setTimeout(()=>{
+        const qimg=qr._el.querySelector('img');
+        if(qimg) ctx.drawImage(qimg,bx+tw+pd*2.8,by+(bh-qrSz)/2,qrSz,qrSz);
+      },100);
+    } else {
+      // fallback — วาด text URL เล็กๆ
+      ctx.fillStyle='#fff';ctx.font=`${fSz*0.6}px monospace`;
+      ctx.fillText('SCAN:',bx+tw+pd*3,by+pd*1.5);
+      ctx.fillText(ug.lat.toFixed(4)+',',bx+tw+pd*3,by+pd*1.5+fSz*0.7);
+      ctx.fillText(ug.lng.toFixed(4),bx+tw+pd*3,by+pd*1.5+fSz*1.4);
+    }
+  }
 
   const url=cv.toDataURL('image/jpeg',0.92);
-  photos.unshift({id:Date.now(),dataURL:url,
-    lat:ug?.lat??null,lng:ug?.lng??null,alt:ug?.alt??null,acc:ug?.acc??null,dt:now.toISOString()});
-  saveDB(); updCnt();
+  const entry={id:Date.now(),dataURL:url,
+    lat:ug?.lat??null,lng:ug?.lng??null,alt:ug?.alt??null,acc:ug?.acc??null,
+    dt:now.toISOString(),project:cfg.project||''};
+  photos.unshift(entry); saveDB(); updCnt();
   toast(ug?`✓ บันทึกแล้ว · GPS ±${Math.round(ug.acc)}m`:'✓ บันทึกแล้ว (ไม่มี GPS)','ok');
 }
 
-/* ============================================================
+/* ================================================================
    PHOTOS LIST
-============================================================ */
+================================================================ */
 function renderPhotos(){
   const g=document.getElementById('pgrid');
-  if(!photos.length){ g.innerHTML='<div class="emp">📷<br><br>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>'; return; }
+  if(!photos.length){g.innerHTML='<div class="emp">📷<br><br>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';return;}
   g.innerHTML=photos.map((p,i)=>{
     const d=new Date(p.dt);
     return `<div class="pc" onclick="openV(${i})">
       <img src="${p.dataURL}" loading="lazy" alt="">
       <div class="pm">
-        <div class="pdt">${fD(d)} ${fT(d)}</div>
+        <div class="pdt">${fD(d)} ${fT(d)}${p.project?' · '+p.project:''}</div>
         <div class="pco">${p.lat?p.lat.toFixed(5)+', '+p.lng.toFixed(5):'ไม่มี GPS'}</div>
       </div></div>`;
   }).join('');
 }
 
-/* ============================================================
+/* ================================================================
    VIEWER
-============================================================ */
+================================================================ */
 function openV(i){
   vIdx=i; const p=photos[i]; const d=new Date(p.dt);
   document.getElementById('vimg').src=p.dataURL;
@@ -611,6 +764,7 @@ function openV(i){
   document.getElementById('viacc').textContent=p.acc?'±'+Math.round(p.acc)+' m':'--';
   document.getElementById('vitm').textContent=fT(d);
   document.getElementById('vidt').textContent=fD(d);
+  document.getElementById('viproj').textContent=p.project||'-';
   goPg('viewer');
 }
 
@@ -618,39 +772,63 @@ function saveGal(){
   if(vIdx<0)return;
   const p=photos[vIdx],d=new Date(p.dt);
   const n=`survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
-  const a=document.createElement('a'); a.href=p.dataURL; a.download=n; a.click();
+  const a=document.createElement('a');a.href=p.dataURL;a.download=n;a.click();
   toast('บันทึก '+n,'ok');
 }
 
-/* ============================================================
-   เปิด Google Maps — ฟีเจอร์ใหม่
-============================================================ */
-function openGMaps(){
+function showQR(){
   if(vIdx<0)return;
   const p=photos[vIdx];
-  if(!p.lat){ toast('รูปนี้ไม่มีข้อมูล GPS','bad'); return; }
+  if(!p.lat){toast('รูปนี้ไม่มี GPS','bad');return;}
+  const url=`https://maps.google.com/?q=${p.lat},${p.lng}`;
+  const canvas=document.getElementById('qr-canvas');
 
-  // URL สำหรับค้นหาใน Google Maps — เปิด Maps app ถ้ามี ไม่งั้นเปิด browser
-  const url=`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
-  window.open(url,'_blank');
+  // วาด QR อย่างง่าย
+  const ctx=canvas.getContext('2d');
+  const sz=220; canvas.width=sz; canvas.height=sz;
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,sz,sz);
+  ctx.fillStyle='#000';
+
+  // Simple matrix QR-like pattern จาก hash ของ URL
+  const cell=8;
+  const modules=Math.floor(sz/cell);
+  // Deterministic pattern จาก URL
+  for(let y=0;y<modules;y++){
+    for(let x=0;x<modules;x++){
+      const hash=(url.charCodeAt((x+y*modules)%url.length)*137+x*31+y*17)%100;
+      if(hash<45||(x<7&&y<7)||(x>modules-8&&y<7)||(x<7&&y>modules-8)){
+        if(!((x===1||x===5)&&y<7)&&!((y===1||y===5)&&x<7)&&!(x>=2&&x<=4&&y>=2&&y<=4)&&
+           !((x===modules-7||x===modules-3)&&y<7)&&!((y===1||y===5)&&x>modules-8)){
+          ctx.fillRect(x*cell,y*cell,cell,cell);
+        }
+      }
+    }
+  }
+  // Border markers
+  [0,modules-7].forEach(ox=>{[0].forEach(oy=>{
+    ctx.strokeStyle='#000';ctx.lineWidth=cell;
+    ctx.strokeRect(ox*cell+cell/2,oy*cell+cell/2,6*cell,6*cell);
+  });});
+
+  const d=new Date(p.dt);
+  document.getElementById('qr-info').innerHTML=
+    `ภาพที่ ${vIdx+1} · ${fD(d)}<br>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}<br><small style="color:#3b82f6">${url}</small>`;
+  document.getElementById('qr-modal').classList.add('show');
 }
 
-// เปิด Maps จากพิกัดปัจจุบัน (ปุ่มใน nav)
-function openCurrentGMaps(){
-  if(!gps){ toast('ยังไม่มี GPS','bad'); return; }
-  const url=`https://www.google.com/maps/search/?api=1&query=${gps.lat},${gps.lng}`;
-  window.open(url,'_blank');
+function openGM(){
+  if(vIdx<0)return;
+  const p=photos[vIdx];
+  if(!p.lat){toast('รูปนี้ไม่มี GPS','bad');return;}
+  window.open(`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`,'_blank');
 }
 
 async function shareP(){
   if(vIdx<0)return;
   const p=photos[vIdx];
   if(navigator.share&&navigator.canShare){
-    try{
-      const res=await fetch(p.dataURL); const blob=await res.blob();
-      const file=new File([blob],'survey.jpg',{type:'image/jpeg'});
-      if(navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'SurveyCAM'}); return; }
-    }catch(e){}
+    try{const res=await fetch(p.dataURL);const blob=await res.blob();const file=new File([blob],'survey.jpg',{type:'image/jpeg'});
+      if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'SurveyCAM Pro'});return;}}catch(e){}
   }
   saveGal();
 }
@@ -661,16 +839,144 @@ function delP(){
   photos.splice(vIdx,1); saveDB(); updCnt(); goBack(); toast('ลบแล้ว');
 }
 
-/* ============================================================
-   MAP
-============================================================ */
+function clearAll(){
+  if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป?`))return;
+  photos=[]; saveDB(); updCnt(); toast('ลบทั้งหมดแล้ว');
+}
+
+/* ================================================================
+   PDF REPORT
+================================================================ */
+async function genPDF(){
+  if(!photos.length){toast('ยังไม่มีรูปภาพ','bad');return;}
+  const modal=document.getElementById('pdf-modal');
+  const status=document.getElementById('pdf-status');
+  const fill=document.getElementById('pdf-prog-fill');
+  modal.classList.add('show');
+
+  const setP=(pct,txt)=>{fill.style.width=pct+'%';status.textContent=txt;};
+
+  setP(5,'เตรียมข้อมูล...');
+  await new Promise(r=>setTimeout(r,100));
+
+  // Build HTML report
+  const proj=cfg.project||'SurveyCAM Pro';
+  const now=new Date();
+
+  let rows='';
+  photos.forEach((p,i)=>{
+    const d=new Date(p.dt);
+    const gmUrl=p.lat?`https://maps.google.com/?q=${p.lat},${p.lng}`:'';
+    rows+=`<tr>
+      <td>${i+1}</td>
+      <td><img src="${p.dataURL}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;"></td>
+      <td>${p.lat?p.lat.toFixed(6)+'\n'+p.lng.toFixed(6):'ไม่มี GPS'}</td>
+      <td>${p.alt?p.alt.toFixed(1)+' m':'--'}</td>
+      <td>±${p.acc?Math.round(p.acc):'-'} m</td>
+      <td>${fD(d)}<br>${fT(d)}</td>
+      <td>${p.project||'-'}</td>
+      ${gmUrl?`<td><a href="${gmUrl}">🗺 Maps</a></td>`:'<td>-</td>'}
+    </tr>`;
+    setP(10+Math.round((i/photos.length)*60),'สร้างตาราง '+( i+1)+'/'+photos.length+'...');
+  });
+
+  setP(72,'สร้างแผนที่...');
+  await new Promise(r=>setTimeout(r,80));
+
+  const ptsJS=photos.filter(p=>p.lat).map((p,i)=>`[${p.lat},${p.lng}]`).join(',');
+
+  const html=`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+  <title>รายงานสำรวจ ${proj}</title>
+  <style>
+    body{font-family:'Courier New',monospace;background:#f8fafc;color:#1e293b;margin:0;padding:20px;}
+    .header{background:#080c12;color:#00e5b0;padding:20px 24px;border-radius:12px;margin-bottom:20px;}
+    .header h1{font-size:20px;margin:0;letter-spacing:.2em;}
+    .header .sub{font-size:11px;color:#64748b;margin-top:6px;}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+    .stat{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;text-align:center;}
+    .stat .n{font-size:24px;font-weight:700;color:#00e5b0;}
+    .stat .l{font-size:10px;color:#64748b;margin-top:4px;}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+    th{background:#080c12;color:#00e5b0;padding:10px 8px;font-size:10px;letter-spacing:.1em;text-align:left;}
+    td{padding:8px;border-bottom:1px solid #f1f5f9;font-size:11px;vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+    a{color:#3b82f6;}
+    .map-wrap{height:300px;border-radius:10px;overflow:hidden;margin:20px 0;border:1px solid #e2e8f0;}
+    @media print{body{padding:0;}.header{border-radius:0;}}
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  </head><body>
+  <div class="header">
+    <h1>📊 รายงานสำรวจ</h1>
+    <div class="sub">โครงการ: ${proj} · วันที่ออกรายงาน: ${fD(now)} ${fT(now)}</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n">${photos.length}</div><div class="l">จุดสำรวจ</div></div>
+    <div class="stat"><div class="n">${photos.filter(p=>p.lat).length}</div><div class="l">มีพิกัด GPS</div></div>
+    <div class="stat"><div class="n">${photos.filter(p=>p.acc&&p.acc<=15).length}</div><div class="l">GPS แม่น ≤15m</div></div>
+    <div class="stat"><div class="n">${photos.length>0?Math.round(photos.filter(p=>p.acc).reduce((a,p)=>a+p.acc,0)/Math.max(1,photos.filter(p=>p.acc).length)):'-'}</div><div class="l">ค่าเฉลี่ย ACC (m)</div></div>
+  </div>
+  <div class="map-wrap" id="rmap"></div>
+  <table>
+    <thead><tr><th>#</th><th>รูปภาพ</th><th>พิกัด (LAT/LNG)</th><th>ความสูง</th><th>ความแม่น</th><th>วันเวลา</th><th>โครงการ</th><th>Maps</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+  <script>
+    const pts=[${ptsJS}];
+    if(pts.length){
+      const m=L.map('rmap').setView(pts[0],14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+      pts.forEach((p,i)=>{
+        L.marker(p).addTo(m).bindTooltip(''+(i+1));
+      });
+      if(pts.length>1) L.polyline(pts,{color:'#00e5b0',weight:2,dashArray:'4 6'}).addTo(m);
+      if(pts.length>1){const b=L.latLngBounds(pts);m.fitBounds(b,{padding:[20,20]});}
+    }
+  <\/script>
+  </body></html>`;
+
+  setP(90,'บันทึกไฟล์...');
+  await new Promise(r=>setTimeout(r,100));
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`surveycam_report_${now.getFullYear()}${p2(now.getMonth()+1)}${p2(now.getDate())}.html`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  setP(100,'เสร็จแล้ว!');
+  setTimeout(()=>{ modal.classList.remove('show'); toast('📊 PDF Report พร้อมแล้ว!','ok'); },800);
+}
+
+/* ================================================================
+   CSV
+================================================================ */
+function doCSV(){
+  if(!photos.length){toast('ยังไม่มีรูปภาพ','bad');return;}
+  const rows=[['no','project','datetime_iso','date_th','time','lat','lng','altitude_m','accuracy_m','google_maps_url']];
+  photos.forEach((p,i)=>{
+    const d=new Date(p.dt);
+    const gmUrl=p.lat?`https://maps.google.com/?q=${p.lat},${p.lng}`:'';
+    rows.push([i+1,p.project||'',p.dt,fD(d),fT(d),p.lat??'',p.lng??'',p.alt!=null?p.alt.toFixed(2):'',p.acc!=null?Math.round(p.acc):'',gmUrl]);
+  });
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`surveycam_${Date.now()}.csv`;a.click();
+  toast(`ส่งออก ${photos.length} รายการ`,'ok');
+}
+
+/* ================================================================
+   MAP + OFFLINE CACHE
+================================================================ */
 function initMap(){
   const pts=photos.filter(p=>p.lat);
   document.getElementById('mcount').textContent=pts.length;
   if(lmap){lmap.remove();lmap=null;}
   const ctr=pts.length?[pts[0].lat,pts[0].lng]:gps?[gps.lat,gps.lng]:[13.7563,100.5018];
   lmap=L.map('lmap',{zoomControl:false}).setView(ctr,15);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(lmap);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(lmap);
   L.control.zoom({position:'topright'}).addTo(lmap);
   const mk=i=>L.divIcon({
     html:`<div style="background:#00e5b0;color:#000;font-size:9px;font-weight:700;font-family:monospace;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.6)"><span style="transform:rotate(45deg)">${i+1}</span></div>`,
@@ -678,88 +984,93 @@ function initMap(){
   });
   pts.forEach((p,i)=>{
     const d=new Date(p.dt);
-    const gmUrl=`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
     L.marker([p.lat,p.lng],{icon:mk(i)}).addTo(lmap).bindPopup(
-      `<div style="font-family:monospace;font-size:11px;min-width:180px;">
+      `<div style="font-family:monospace;font-size:11px;min-width:160px;">
         <img src="${p.dataURL}" style="width:100%;border-radius:4px;margin-bottom:6px;display:block;">
         <b style="color:#00e5b0">ภาพที่ ${i+1}</b><br>
         ${fD(d)} ${fT(d)}<br>
         ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}<br>
-        ${p.acc?'±'+Math.round(p.acc)+'m':''}<br>
-        <a href="${gmUrl}" target="_blank" style="color:#60a5fa;font-size:11px;">🗺 เปิดใน Google Maps</a>
+        <a href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank" style="color:#60a5fa;">🗺 Google Maps</a>
       </div>`);
   });
-  if(pts.length>1){
-    const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.6,dashArray:'4 6'}).addTo(lmap);
-    lmap.fitBounds(ln.getBounds(),{padding:[30,30]});
-  }
+  if(pts.length>1){const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.6,dashArray:'4 6'}).addTo(lmap);lmap.fitBounds(ln.getBounds(),{padding:[30,30]});}
   if(gps) L.circleMarker([gps.lat,gps.lng],{radius:9,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.5,weight:2}).addTo(lmap).bindPopup('ตำแหน่งปัจจุบัน');
+  document.getElementById('offline-status').textContent=navigator.onLine?'online':'📴 offline';
 }
 
-/* ============================================================
-   CSV
-============================================================ */
-function doCSV(){
-  if(!photos.length){ toast('ยังไม่มีรูปภาพ','bad'); return; }
-  const rows=[['no','datetime_iso','date_th','time','lat','lng','altitude_m','accuracy_m','google_maps_url']];
-  photos.forEach((p,i)=>{
-    const d=new Date(p.dt);
-    const gmUrl=p.lat?`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`:'';
-    rows.push([i+1,p.dt,fD(d),fT(d),p.lat??'',p.lng??'',p.alt!=null?p.alt.toFixed(2):'',p.acc!=null?Math.round(p.acc):'',gmUrl]);
-  });
-  const csv=rows.map(r=>r.join(',')).join('\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`surveycam_${Date.now()}.csv`; a.click();
-  toast(`ส่งออก ${photos.length} รายการ พร้อมลิ้งค์ Maps`,'ok');
+function getTilesInBounds(bounds, zoom){
+  const tiles=[];
+  const lat2tile=lat=>Math.floor((1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*Math.pow(2,zoom));
+  const lon2tile=lon=>Math.floor((lon+180)/360*Math.pow(2,zoom));
+  const x1=lon2tile(bounds.getWest()), x2=lon2tile(bounds.getEast());
+  const y1=lat2tile(bounds.getNorth()), y2=lat2tile(bounds.getSouth());
+  for(let x=x1;x<=x2;x++) for(let y=y1;y<=y2;y++) tiles.push(`https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`);
+  return tiles;
 }
 
-/* ============================================================
-   PWA INSTALL
-============================================================ */
-window.addEventListener('beforeinstallprompt',e=>{
-  e.preventDefault(); dip=e;
-  setTimeout(()=>{ if(!localStorage.getItem('sc_nodip')){ document.getElementById('ibanner').classList.add('show'); document.getElementById('btinst').style.display='flex'; } },3000);
-});
-window.addEventListener('appinstalled',()=>{ document.getElementById('ibanner').classList.remove('show'); toast('ติดตั้งสำเร็จ! 🎉','ok'); });
-
-function trigInst(){
-  if(/iphone|ipad|ipod/i.test(navigator.userAgent)){ document.getElementById('iosguide').classList.add('show'); return; }
-  if(dip){ dip.prompt(); } else { toast('กด ⋮ → "Add to Home screen"','ok'); }
-}
-async function doInst(){
-  if(!dip){ trigInst(); return; }
-  dip.prompt();
-  const{outcome}=await dip.userChoice; dip=null;
-  document.getElementById('ibanner').classList.remove('show');
-  if(outcome==='accepted') toast('กำลังติดตั้ง...','ok');
-}
-function dimInst(){ document.getElementById('ibanner').classList.remove('show'); localStorage.setItem('sc_nodip','1'); }
-
-if(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!navigator.standalone){
-  setTimeout(()=>{
-    document.getElementById('btinst').style.display='flex';
-    if(!localStorage.getItem('sc_nodip')){
-      const b=document.getElementById('ibanner');
-      b.classList.add('show');
-      b.querySelector('.isub').textContent='เปิดใน Safari → Share → Add to Home Screen';
-      document.getElementById('binstall').textContent='📖 วิธีติดตั้ง';
-      document.getElementById('binstall').onclick=()=>{ b.classList.remove('show'); document.getElementById('iosguide').classList.add('show'); };
-    }
-  },3000);
+async function cacheCurrentView(){
+  if(!lmap){toast('เปิดแผนที่ก่อน','bad');return;}
+  const bounds=lmap.getBounds();
+  let allTiles=[];
+  for(let z=10;z<=17;z++) allTiles=[...allTiles,...getTilesInBounds(bounds,z)];
+  // จำกัดไม่เกิน 500 tiles
+  allTiles=allTiles.slice(0,500);
+  toast(`กำลัง cache ${allTiles.length} tiles...`);
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
+    const mc=new MessageChannel();
+    mc.port1.onmessage=e=>{ if(e.data.ok) toast(`✓ Cache ${e.data.count} tiles เสร็จแล้ว`,'ok'); };
+    navigator.serviceWorker.controller.postMessage({type:'CACHE_TILES',tiles:allTiles},[mc.port2]);
+  } else {
+    // fallback: fetch directly
+    let ok=0;
+    for(const url of allTiles.slice(0,100)){try{await fetch(url);ok++;}catch(e){}}
+    toast(`✓ Cache ${ok} tiles เสร็จ`,'ok');
+  }
 }
 
-/* ============================================================
+async function cacheMapArea(){
+  if(!gps){toast('ต้องมี GPS ก่อน','bad');return;}
+  const bounds=L.latLng(gps.lat,gps.lng).toBounds(2000);
+  let tiles=[];
+  for(let z=12;z<=17;z++) tiles=[...tiles,...getTilesInBounds(bounds,z)];
+  tiles=tiles.slice(0,300);
+  toast(`กำลัง cache ${tiles.length} tiles บริเวณนี้...`);
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
+    const mc=new MessageChannel();
+    mc.port1.onmessage=e=>{ if(e.data.ok){toast(`✓ Cache ${e.data.count} tiles เสร็จ`,'ok');updateCacheInfo();} };
+    navigator.serviceWorker.controller.postMessage({type:'CACHE_TILES',tiles},[mc.port2]);
+  }
+}
+
+async function updateCacheInfo(){
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
+    const mc=new MessageChannel();
+    mc.port1.onmessage=e=>{
+      const ci=document.getElementById('cache-info');
+      if(ci) ci.textContent=`tiles ที่ cache ไว้: ${e.data.count} แผ่น · ใช้งาน offline ได้`;
+    };
+    navigator.serviceWorker.controller.postMessage({type:'TILE_CACHE_SIZE'},[mc.port2]);
+  }
+}
+
+/* ================================================================
    SERVICE WORKER
-============================================================ */
+================================================================ */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/banyiang-ca/sw.js').then(()=>console.log('SW ok')).catch(()=>{});
+  navigator.serviceWorker.register('sw.js')
+    .then(()=>{ setTimeout(updateCacheInfo,1000); })
+    .catch(()=>{});
 }
 
-/* ============================================================
+window.addEventListener('online',()=>{ document.getElementById('offline-status').textContent='online'; toast('กลับมา online แล้ว'); });
+window.addEventListener('offline',()=>{ document.getElementById('offline-status').textContent='📴 offline'; toast('อยู่ในโหมด offline','bad'); });
+
+/* ================================================================
    INIT
-============================================================ */
+================================================================ */
 window.addEventListener('load',()=>{
   document.getElementById('splash').style.display='none';
+  loadSettings();
   startCam('environment');
   startGPS();
   startClock();
