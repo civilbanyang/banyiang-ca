@@ -1,7 +1,7 @@
 {
-  "name": "SurveyCAM",
+  "name": "SurveyCAM Pro",
   "short_name": "SurveyCAM",
-  "description": "กล้องสำรวจ GPS - ถ่ายภาพติดพิกัด",
+  "description": "กล้องสำรวจ GPS Pro - QR, PDF, Offline Map",
   "start_url": "https://civilbanyang.github.io/banyiang-ca/",
   "scope": "https://civilbanyang.github.io/banyiang-ca/",
   "display": "standalone",
