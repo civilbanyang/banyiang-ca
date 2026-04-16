@@ -417,6 +417,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
         <tr><td class="lb">โครงการ</td><td class="vl" id="viproj">--</td></tr>
       </table>
       <div class="arow">
+        <button class="ab pr" onclick="uploadToCloud()" id="btn-upcloud">☁️ ขึ้นคลาวด์</button>
         <button class="ab pr" onclick="saveGal()">⬇ บันทึก</button>
         <button class="ab" onclick="showQR()">▦ QR</button>
         <button class="ab gm" onclick="openGM()">🗺 Maps</button>
@@ -842,6 +843,65 @@ function delP(){
 function clearAll(){
   if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป?`))return;
   photos=[]; saveDB(); updCnt(); toast('ลบทั้งหมดแล้ว');
+}
+
+  /* ================================================================
+   CLOUD UPLOAD (Google Drive & Sheets)
+================================================================ */
+// นำ Web App URL ที่ได้จาก Apps Script มาใส่ตรงนี้
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwB__JHwqwPJgbk619CXevuQj8qEnkDyhcal8J1AdPnlGRJtoHQHfkVbPv5zM2MF3xIgQ/exec';
+
+async function uploadToCloud() {
+  if (vIdx < 0) return;
+  const p = photos[vIdx];
+  const btn = document.getElementById('btn-upcloud');
+  
+  // สร้างชื่อไฟล์ตามวันที่
+  const d = new Date(p.dt);
+  const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
+
+  const payload = {
+    id: p.id,
+    dataURL: p.dataURL,
+    filename: fname,
+    lat: p.lat || '',
+    lng: p.lng || '',
+    alt: p.alt || '',
+    acc: p.acc || '',
+    dt: p.dt,
+    project: p.project || ''
+  };
+
+  try {
+    toast('กำลังอัปโหลด... อาจใช้เวลาสักครู่');
+    btn.textContent = '⏳ กำลังอัปโหลด...';
+    btn.style.pointerEvents = 'none'; // ป้องกันการกดซ้ำ
+
+    // ส่งข้อมูลไปที่ Apps Script
+    // ใช้ text/plain เพื่อหลีกเลี่ยงปัญหา CORS preflight ในบราวเซอร์
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
+
+    const result = await res.json();
+    
+    if (result.status === 'success') {
+      toast('✓ อัปโหลดขึ้น Cloud สำเร็จ!', 'ok');
+      // เพิ่มลูกเล่นให้รู้ว่ารูปนี้อัปโหลดแล้ว
+      btn.textContent = '✅ อัปโหลดแล้ว';
+    } else {
+      toast('❌ อัปโหลดล้มเหลว: ' + result.message, 'bad');
+      btn.textContent = '☁️ ลองใหม่';
+      btn.style.pointerEvents = 'auto';
+    }
+  } catch (err) {
+    console.error(err);
+    toast('❌ เชื่อมต่อล้มเหลว กรุณาลองใหม่เมื่อมีเน็ต', 'bad');
+    btn.textContent = '☁️ ขึ้นคลาวด์';
+    btn.style.pointerEvents = 'auto';
+  }
 }
 
 /* ================================================================
