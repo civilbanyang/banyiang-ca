@@ -222,6 +222,10 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
   cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 #mcache-btn:active{border-color:var(--ac);color:var(--ac);}
 
+/* CUSTOM POPUP SCROLL */
+.map-popup-scroll::-webkit-scrollbar { width: 4px; }
+.map-popup-scroll::-webkit-scrollbar-thumb { background: var(--ac); border-radius: 4px; }
+
 #cvs{display:none;}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999;transition:opacity .06s;}
 #flash.on{opacity:.85;}
@@ -417,7 +421,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
         <tr><td class="lb">โครงการ</td><td class="vl" id="viproj">--</td></tr>
       </table>
       <div class="arow">
-        <button class="ab pr" onclick="uploadToCloud()" id="btn-upcloud">☁️ ขึ้นคลาวด์</button>
+        <button class="ab pr" onclick="uploadToCloud()" id="btn-upcloud">☁️ อัปโหลดใหม่</button>
         <button class="ab pr" onclick="saveGal()">⬇ บันทึก</button>
         <button class="ab" onclick="showQR()">▦ QR</button>
         <button class="ab gm" onclick="openGM()">🗺 Maps</button>
@@ -468,6 +472,9 @@ let photos = [], gps = null, bestGps = null, gpsHist = [];
 let facing = 'environment', stream = null, zLv = 1, zCaps = null;
 let stack = [], vIdx = -1, lmap = null;
 let timerRunning = false, lockPending = false;
+
+// ใส่ URL ของ Google Apps Script ของคุณตรงนี้
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwB__JHwqwPJgbk619CXevuQj8qEnkDyhcal8J1AdPnlGRJtoHQHfkVbPv5zM2MF3xIgQ/exec';
 
 let cfg = { grid:false, timer:0, res:'4k', gpsThresh:15, qr:false, project:'' };
 try { cfg = {...cfg, ...JSON.parse(localStorage.getItem(SETKEY)||'{}')}; } catch(e){}
@@ -627,35 +634,7 @@ function startTimerOrCapture(){
 }
 
 /* ================================================================
-   QR CODE GENERATOR (ไม่ใช้ library ภายนอก)
-================================================================ */
-function genQRData(text){
-  // ใช้ QR code library จาก CDN
-  return text;
-}
-
-// วาด QR Code บน canvas โดยใช้ qrcode.js
-function drawQR(canvas, text, size=220){
-  // Simple QR placeholder — URL จะแสดงเป็น text ก่อน
-  // จะถูกแทนที่โดย library
-  const ctx=canvas.getContext('2d');
-  canvas.width=size; canvas.height=size;
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size);
-  ctx.fillStyle='#000'; ctx.font=`bold 11px monospace`;
-  ctx.textAlign='center';
-  // wrapping text
-  const words=text.split('');
-  let line='',y=30,maxW=size-20;
-  ctx.fillText('QR CODE',size/2,y); y+=20;
-  ctx.font='9px monospace';
-  for(let i=0;i<text.length;i+=20){
-    ctx.fillText(text.slice(i,i+20),size/2,y); y+=14;
-    if(y>size-10) break;
-  }
-}
-
-/* ================================================================
-   CAPTURE
+   CAPTURE & AUTO UPLOAD
 ================================================================ */
 function doCapture(){
   const v=document.getElementById('video');
@@ -712,14 +691,12 @@ function doCapture(){
     const qUrl=`https://maps.google.com/?q=${ug.lat},${ug.lng}`;
     const qcv=document.createElement('canvas');
     if(window.QRCode){
-      // ใช้ library ถ้ามี
       const qr=new QRCode(document.createElement('div'),{text:qUrl,width:qrSz,height:qrSz,correctLevel:QRCode.CorrectLevel.M});
       setTimeout(()=>{
         const qimg=qr._el.querySelector('img');
         if(qimg) ctx.drawImage(qimg,bx+tw+pd*2.8,by+(bh-qrSz)/2,qrSz,qrSz);
       },100);
     } else {
-      // fallback — วาด text URL เล็กๆ
       ctx.fillStyle='#fff';ctx.font=`${fSz*0.6}px monospace`;
       ctx.fillText('SCAN:',bx+tw+pd*3,by+pd*1.5);
       ctx.fillText(ug.lat.toFixed(4)+',',bx+tw+pd*3,by+pd*1.5+fSz*0.7);
@@ -733,6 +710,41 @@ function doCapture(){
     dt:now.toISOString(),project:cfg.project||''};
   photos.unshift(entry); saveDB(); updCnt();
   toast(ug?`✓ บันทึกแล้ว · GPS ±${Math.round(ug.acc)}m`:'✓ บันทึกแล้ว (ไม่มี GPS)','ok');
+
+  // ทำการอัปโหลดอัตโนมัติทันทีที่บันทึกรูปเสร็จ
+  autoUploadCurrentPhoto(entry);
+}
+
+// ฟังก์ชันสำหรับส่งขึ้น Cloud อัตโนมัติ (ทำงานอยู่เบื้องหลัง)
+async function autoUploadCurrentPhoto(p) {
+  if(!navigator.onLine) return; // ถ้าไม่มีเน็ต ให้ข้ามไปก่อน
+  
+  const d = new Date(p.dt);
+  const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
+
+  const payload = {
+    id: p.id,
+    dataURL: p.dataURL,
+    filename: fname,
+    lat: p.lat || '', lng: p.lng || '', alt: p.alt || '', acc: p.acc || '',
+    dt: p.dt, project: p.project || ''
+  };
+
+  try {
+    toast('☁️ กำลังส่งข้อมูลขึ้น Google Sheets...', 'ok');
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
+    const result = await res.json();
+    if (result.status === 'success') {
+      toast('✓ อัปโหลดรูปล่าสุดอัตโนมัติสำเร็จ!', 'ok');
+    }
+  } catch (err) {
+    console.error('Auto upload failed:', err);
+    // ไม่ต้องแจ้งเตือนรบกวนผู้ใช้ ปล่อยให้มันล้มเหลวเงียบๆ ถ้าเน็ตหลุด
+  }
 }
 
 /* ================================================================
@@ -766,6 +778,12 @@ function openV(i){
   document.getElementById('vitm').textContent=fT(d);
   document.getElementById('vidt').textContent=fD(d);
   document.getElementById('viproj').textContent=p.project||'-';
+  
+  // รีเซ็ตปุ่มอัปโหลด
+  const btn = document.getElementById('btn-upcloud');
+  btn.textContent = '☁️ อัปโหลดขึ้นคลาวด์';
+  btn.style.pointerEvents = 'auto';
+  
   goPg('viewer');
 }
 
@@ -784,16 +802,13 @@ function showQR(){
   const url=`https://maps.google.com/?q=${p.lat},${p.lng}`;
   const canvas=document.getElementById('qr-canvas');
 
-  // วาด QR อย่างง่าย
   const ctx=canvas.getContext('2d');
   const sz=220; canvas.width=sz; canvas.height=sz;
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,sz,sz);
   ctx.fillStyle='#000';
 
-  // Simple matrix QR-like pattern จาก hash ของ URL
   const cell=8;
   const modules=Math.floor(sz/cell);
-  // Deterministic pattern จาก URL
   for(let y=0;y<modules;y++){
     for(let x=0;x<modules;x++){
       const hash=(url.charCodeAt((x+y*modules)%url.length)*137+x*31+y*17)%100;
@@ -805,7 +820,6 @@ function showQR(){
       }
     }
   }
-  // Border markers
   [0,modules-7].forEach(ox=>{[0].forEach(oy=>{
     ctx.strokeStyle='#000';ctx.lineWidth=cell;
     ctx.strokeRect(ox*cell+cell/2,oy*cell+cell/2,6*cell,6*cell);
@@ -845,40 +859,29 @@ function clearAll(){
   photos=[]; saveDB(); updCnt(); toast('ลบทั้งหมดแล้ว');
 }
 
-  /* ================================================================
-   CLOUD UPLOAD (Google Drive & Sheets)
+/* ================================================================
+   MANUAL CLOUD UPLOAD (Google Drive & Sheets)
 ================================================================ */
-// นำ Web App URL ที่ได้จาก Apps Script มาใส่ตรงนี้
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwB__JHwqwPJgbk619CXevuQj8qEnkDyhcal8J1AdPnlGRJtoHQHfkVbPv5zM2MF3xIgQ/exec';
-
+// ฟังก์ชันนี้เก็บไว้ให้ผู้ใช้กดอัปโหลดเอง กรณีที่อัปโหลดอัตโนมัติตอนถ่ายรูปไม่สำเร็จ (เช่น ไม่มีเน็ต)
 async function uploadToCloud() {
   if (vIdx < 0) return;
   const p = photos[vIdx];
   const btn = document.getElementById('btn-upcloud');
   
-  // สร้างชื่อไฟล์ตามวันที่
   const d = new Date(p.dt);
   const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
 
   const payload = {
-    id: p.id,
-    dataURL: p.dataURL,
-    filename: fname,
-    lat: p.lat || '',
-    lng: p.lng || '',
-    alt: p.alt || '',
-    acc: p.acc || '',
-    dt: p.dt,
-    project: p.project || ''
+    id: p.id, dataURL: p.dataURL, filename: fname,
+    lat: p.lat || '', lng: p.lng || '', alt: p.alt || '', acc: p.acc || '',
+    dt: p.dt, project: p.project || ''
   };
 
   try {
     toast('กำลังอัปโหลด... อาจใช้เวลาสักครู่');
     btn.textContent = '⏳ กำลังอัปโหลด...';
-    btn.style.pointerEvents = 'none'; // ป้องกันการกดซ้ำ
+    btn.style.pointerEvents = 'none';
 
-    // ส่งข้อมูลไปที่ Apps Script
-    // ใช้ text/plain เพื่อหลีกเลี่ยงปัญหา CORS preflight ในบราวเซอร์
     const res = await fetch(GAS_URL, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -889,7 +892,6 @@ async function uploadToCloud() {
     
     if (result.status === 'success') {
       toast('✓ อัปโหลดขึ้น Cloud สำเร็จ!', 'ok');
-      // เพิ่มลูกเล่นให้รู้ว่ารูปนี้อัปโหลดแล้ว
       btn.textContent = '✅ อัปโหลดแล้ว';
     } else {
       toast('❌ อัปโหลดล้มเหลว: ' + result.message, 'bad');
@@ -899,7 +901,7 @@ async function uploadToCloud() {
   } catch (err) {
     console.error(err);
     toast('❌ เชื่อมต่อล้มเหลว กรุณาลองใหม่เมื่อมีเน็ต', 'bad');
-    btn.textContent = '☁️ ขึ้นคลาวด์';
+    btn.textContent = '☁️ ลองใหม่';
     btn.style.pointerEvents = 'auto';
   }
 }
@@ -919,7 +921,6 @@ async function genPDF(){
   setP(5,'เตรียมข้อมูล...');
   await new Promise(r=>setTimeout(r,100));
 
-  // Build HTML report
   const proj=cfg.project||'SurveyCAM Pro';
   const now=new Date();
 
@@ -1028,33 +1029,72 @@ function doCSV(){
 }
 
 /* ================================================================
-   MAP + OFFLINE CACHE
+   MAP + OFFLINE CACHE + CLUSTERING
 ================================================================ */
 function initMap(){
   const pts=photos.filter(p=>p.lat);
   document.getElementById('mcount').textContent=pts.length;
+  
   if(lmap){lmap.remove();lmap=null;}
   const ctr=pts.length?[pts[0].lat,pts[0].lng]:gps?[gps.lat,gps.lng]:[13.7563,100.5018];
   lmap=L.map('lmap',{zoomControl:false}).setView(ctr,15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(lmap);
   L.control.zoom({position:'topright'}).addTo(lmap);
-  const mk=i=>L.divIcon({
-    html:`<div style="background:#00e5b0;color:#000;font-size:9px;font-weight:700;font-family:monospace;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.6)"><span style="transform:rotate(45deg)">${i+1}</span></div>`,
+  
+  const mk=(idx, count)=>L.divIcon({
+    html:`<div style="background:#00e5b0;color:#000;font-size:9px;font-weight:700;font-family:monospace;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.6);position:relative;">
+            <span style="transform:rotate(45deg)">${idx+1}</span>
+            ${count > 1 ? `<div style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border-radius:50%;width:14px;height:14px;font-size:8px;display:flex;align-items:center;justify-content:center;transform:rotate(45deg);border:1px solid #fff;">${count}</div>` : ''}
+          </div>`,
     className:'',iconSize:[26,26],iconAnchor:[13,26]
   });
-  pts.forEach((p,i)=>{
-    const d=new Date(p.dt);
-    L.marker([p.lat,p.lng],{icon:mk(i)}).addTo(lmap).bindPopup(
-      `<div style="font-family:monospace;font-size:11px;min-width:160px;">
-        <img src="${p.dataURL}" style="width:100%;border-radius:4px;margin-bottom:6px;display:block;">
-        <b style="color:#00e5b0">ภาพที่ ${i+1}</b><br>
-        ${fD(d)} ${fT(d)}<br>
-        ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}<br>
-        <a href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank" style="color:#60a5fa;">🗺 Google Maps</a>
-      </div>`);
+
+  // จัดกลุ่ม (Group) รูปที่มีพิกัดเดียวกัน (ปัดเศษทศนิยม 6 ตำแหน่ง)
+  const groupedPts = {};
+  pts.forEach((p, i) => {
+    // ใช้ Lat/Lng เป็น Key ในการจัดกลุ่ม เพื่อดูว่ารูปไหนซ้อนกันบ้าง
+    const key = `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
+    if(!groupedPts[key]) groupedPts[key] = [];
+    groupedPts[key].push({ p: p, originalIndex: i });
   });
+
+  // สร้าง Marker จากกลุ่มของรูป
+  Object.values(groupedPts).forEach(group => {
+    const firstP = group[0].p;
+    const count = group.length;
+    const latestIdx = group[0].originalIndex; // ดึงหมายเลขรูปล่าสุดในจุดนั้นมาโชว์ที่หมุด
+
+    // สร้างเนื้อหาใน Popup โดยให้สามารถเลื่อน (Scroll) ดูได้ถ้ารูปเยอะ
+    let popupHtml = `<div class="map-popup-scroll" style="font-family:monospace;font-size:11px;min-width:160px;max-height:260px;overflow-y:auto;padding-right:6px;">`;
+    
+    if (count > 1) {
+      popupHtml += `<div style="margin-bottom:8px;background:rgba(0,229,176,0.15);color:#00e5b0;padding:4px 8px;border-radius:4px;text-align:center;font-weight:bold;">จุดนี้มีทั้งหมด ${count} รูปภาพ</div>`;
+    }
+
+    group.forEach((item, groupIdx) => {
+      const p = item.p;
+      const oIdx = item.originalIndex;
+      const d = new Date(p.dt);
+      
+      popupHtml += `
+        <div style="${groupIdx < count - 1 ? 'border-bottom:1px solid #ccc;margin-bottom:10px;padding-bottom:10px;' : 'margin-bottom:6px;'}">
+          <img src="${p.dataURL}" style="width:100%;border-radius:4px;margin-bottom:6px;display:block;">
+          <b style="color:#00e5b0;font-size:12px;">ภาพที่ ${oIdx+1}</b><br>
+          ${fD(d)} ${fT(d)}<br>
+          ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
+        </div>
+      `;
+    });
+
+    popupHtml += `<div style="margin-top:8px;text-align:center;"><a href="https://maps.google.com/?q=${firstP.lat},${firstP.lng}" target="_blank" style="color:#60a5fa;text-decoration:none;font-weight:bold;display:block;background:rgba(59,130,246,0.1);padding:6px;border-radius:6px;border:1px solid rgba(59,130,246,0.3);">🗺 เปิดแผนที่ Google Maps</a></div>`;
+    popupHtml += `</div>`;
+
+    L.marker([firstP.lat, firstP.lng], {icon: mk(latestIdx, count)}).addTo(lmap).bindPopup(popupHtml);
+  });
+
   if(pts.length>1){const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.6,dashArray:'4 6'}).addTo(lmap);lmap.fitBounds(ln.getBounds(),{padding:[30,30]});}
   if(gps) L.circleMarker([gps.lat,gps.lng],{radius:9,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.5,weight:2}).addTo(lmap).bindPopup('ตำแหน่งปัจจุบัน');
+  
   document.getElementById('offline-status').textContent=navigator.onLine?'online':'📴 offline';
 }
 
@@ -1073,7 +1113,6 @@ async function cacheCurrentView(){
   const bounds=lmap.getBounds();
   let allTiles=[];
   for(let z=10;z<=17;z++) allTiles=[...allTiles,...getTilesInBounds(bounds,z)];
-  // จำกัดไม่เกิน 500 tiles
   allTiles=allTiles.slice(0,500);
   toast(`กำลัง cache ${allTiles.length} tiles...`);
   if('serviceWorker' in navigator && navigator.serviceWorker.controller){
@@ -1081,7 +1120,6 @@ async function cacheCurrentView(){
     mc.port1.onmessage=e=>{ if(e.data.ok) toast(`✓ Cache ${e.data.count} tiles เสร็จแล้ว`,'ok'); };
     navigator.serviceWorker.controller.postMessage({type:'CACHE_TILES',tiles:allTiles},[mc.port2]);
   } else {
-    // fallback: fetch directly
     let ok=0;
     for(const url of allTiles.slice(0,100)){try{await fetch(url);ok++;}catch(e){}}
     toast(`✓ Cache ${ok} tiles เสร็จ`,'ok');
