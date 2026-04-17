@@ -468,7 +468,52 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 <div id="toast"></div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<style>
+/* Custom cluster style */
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(0,229,176,0.25)!important;}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{
+  background:rgba(0,229,176,0.85)!important;color:#000!important;font-weight:700!important;
+  font-family:monospace!important;font-size:12px!important;}
+.survey-marker{
+  background:#00e5b0;color:#000;font-size:10px;font-weight:700;
+  font-family:monospace;width:30px;height:30px;
+  border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.5);}
+.survey-marker span{transform:rotate(45deg);}
+.survey-marker.multi{background:#f59e0b;}
+.leaflet-popup-content-wrapper{
+  background:#0e1420!important;border:1px solid rgba(0,229,176,0.3)!important;
+  border-radius:12px!important;box-shadow:0 8px 32px rgba(0,0,0,.6)!important;
+  padding:0!important;}
+.leaflet-popup-content{margin:0!important;width:220px!important;}
+.leaflet-popup-tip{background:#0e1420!important;}
+.leaflet-popup-close-button{color:#64748b!important;top:8px!important;right:8px!important;font-size:16px!important;}
+.pop-wrap{padding:12px;}
+.pop-img{width:100%;height:130px;object-fit:cover;border-radius:8px 8px 0 0;display:block;}
+.pop-badge{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.pop-num{background:rgba(0,229,176,0.15);color:#00e5b0;font-size:10px;font-weight:700;
+  padding:3px 8px;border-radius:20px;border:1px solid rgba(0,229,176,0.3);}
+.pop-sync{font-size:12px;}
+.pop-row{font-size:10px;color:#94a3b8;margin-bottom:3px;display:flex;gap:6px;}
+.pop-row b{color:#eef2ff;font-weight:600;}
+.pop-divider{border:none;border-top:1px solid rgba(255,255,255,0.07);margin:8px 0;}
+.pop-btn{display:block;width:100%;padding:8px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);
+  background:rgba(59,130,246,0.1);color:#60a5fa;font-family:monospace;font-size:10px;
+  text-align:center;text-decoration:none;cursor:pointer;margin-top:4px;}
+.pop-nav{display:flex;gap:6px;margin-top:6px;}
+.pop-nav-btn{flex:1;padding:7px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.05);color:#94a3b8;font-family:monospace;font-size:10px;
+  cursor:pointer;text-align:center;}
+.pop-nav-btn:active{background:rgba(0,229,176,0.15);color:#00e5b0;border-color:rgba(0,229,176,0.3);}
+.pop-multi-header{background:rgba(245,158,11,0.1);border-bottom:1px solid rgba(245,158,11,0.2);
+  padding:8px 12px;border-radius:12px 12px 0 0;color:#f59e0b;font-size:10px;font-weight:700;
+  text-align:center;letter-spacing:.05em;}
+</style>
 <script>
 /* ================================================================
    STATE & SETTINGS (Memory Only - No LocalStorage)
@@ -974,36 +1019,58 @@ async function shareP(){
 
 function delP(){
   if(vIdx<0)return;
-  if(!confirm('ลบรูปนี้? ระบบจะส่งคำสั่งลบไปยัง Cloud ด้วย'))return;
+  if(!confirm('ลบรูปนี้? ระบบจะลบทั้งข้อมูลใน Sheet และไฟล์รูปใน Drive'))return;
   
-  const pId = photos[vIdx].id;
+  const photo = photos[vIdx];
+  const pId = photo.id;
+  let driveFileId = null;
+  if(photo.dataURL && photo.dataURL.includes('drive.google.com')) {
+    const m = photo.dataURL.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if(m) driveFileId = m[1];
+  }
+
   photos.splice(vIdx,1); 
   updCnt(); 
   goBack(); 
-  toast('ลบออกจากหน่วยความจำแล้ว');
+  toast('กำลังลบจาก Cloud...');
 
-  // ส่งคำสั่งลบไปยัง Cloud
   if(navigator.onLine) {
     fetch(GAS_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'deletePhoto', id: pId }),
+      body: JSON.stringify({ action: 'deletePhoto', id: pId, driveFileId: driveFileId }),
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    });
+    }).then(r=>r.json()).then(res=>{
+      if(res.status==='success') toast('\u2713 ลบสำเร็จ (Sheet + Drive)','ok');
+      else toast('ลบ Sheet แล้ว แต่ Drive อาจมีปัญหา','bad');
+    }).catch(()=>toast('ลบออกจากหน่วยความจำแล้ว'));
+  } else {
+    toast('ลบออกจากหน่วยความจำแล้ว (ยังไม่ได้ลบจาก Cloud)');
   }
 }
 
 function clearAll(){
-  if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป? ระบบจะส่งคำสั่งล้างข้อมูลใน Cloud ด้วย`))return;
+  if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป? ระบบจะลบทั้ง Sheet และไฟล์รูปใน Drive`))return;
+  const driveFileIds = photos.map(p => {
+    if(p.dataURL && p.dataURL.includes('drive.google.com')) {
+      const m = p.dataURL.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      return m ? m[1] : null;
+    }
+    return null;
+  }).filter(Boolean);
+
   photos=[]; 
   updCnt(); 
-  toast('ล้างข้อมูลทั้งหมดแล้ว');
+  toast('กำลังลบจาก Cloud...');
 
   if(navigator.onLine) {
     fetch(GAS_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'deleteAllPhotos' }),
+      body: JSON.stringify({ action: 'deleteAllPhotos', driveFileIds: driveFileIds }),
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    });
+    }).then(r=>r.json()).then(res=>{
+      if(res.status==='success') toast('\u2713 ลบทั้งหมดสำเร็จ (Sheet + Drive)','ok');
+      else toast('ล้าง Sheet แล้ว แต่ Drive อาจมีปัญหา','bad');
+    }).catch(()=>toast('ล้างข้อมูลแล้ว'));
   }
 }
 
@@ -1177,6 +1244,56 @@ function doCSV(){
 /* ================================================================
    MAP
 ================================================================ */
+// State สำหรับ popup navigation
+let _popupGroup = [], _popupIdx = 0;
+
+function buildPopupHtml(group, activeIdx) {
+  const item = group[activeIdx];
+  const p = item.p;
+  const oIdx = item.originalIndex;
+  const d = new Date(p.dt);
+  const imgSrc = p.uploaded && p.dataURL && p.dataURL.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
+  const count = group.length;
+
+  let html = '';
+  if(count > 1) {
+    html += `<div class="pop-multi-header">📍 จุดนี้มีทั้งหมด ${count} ภาพ · ดูภาพที่ ${activeIdx+1}/${count}</div>`;
+  }
+  html += `<img class="pop-img" src="${imgSrc}" onerror="this.style.opacity=0.3">`;
+  html += `<div class="pop-wrap">`;
+  html += `<div class="pop-badge">
+    <span class="pop-num">📷 ภาพที่ ${oIdx+1}</span>
+    <span class="pop-sync">${p.uploaded ? '✅' : '☁️'}</span>
+  </div>`;
+  html += `<div class="pop-row">🕐 <b>${fD(d)} ${fT(d)}</b></div>`;
+  if(p.lat) html += `<div class="pop-row">📍 <b>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</b></div>`;
+  if(p.acc) html += `<div class="pop-row">🎯 ความแม่น <b>±${Math.round(p.acc)} m</b></div>`;
+  if(p.alt) html += `<div class="pop-row">⬆️ ความสูง <b>${p.alt.toFixed(1)} m</b></div>`;
+  if(p.project) html += `<div class="pop-row">🏗 <b>${p.project}</b></div>`;
+  
+  if(count > 1) {
+    html += `<div class="pop-nav">
+      <button class="pop-nav-btn" onclick="mapPopNav(-1)" ${activeIdx===0?'disabled style="opacity:.4"':''}>◀ ก่อนหน้า</button>
+      <button class="pop-nav-btn" onclick="mapPopNav(1)" ${activeIdx===count-1?'disabled style="opacity:.4"':''}>ถัดไป ▶</button>
+    </div>`;
+  }
+
+  if(p.lat) {
+    html += `<hr class="pop-divider">
+    <a class="pop-btn" href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank">🗺 เปิด Google Maps</a>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+let _activeMarker = null;
+function mapPopNav(dir) {
+  _popupIdx = Math.max(0, Math.min(_popupGroup.length - 1, _popupIdx + dir));
+  if(_activeMarker) {
+    _activeMarker.setPopupContent(buildPopupHtml(_popupGroup, _popupIdx));
+  }
+}
+
 function initMap(){
   const pts=photos.filter(p=>p.lat);
   document.getElementById('mcount').textContent=pts.length;
@@ -1184,22 +1301,33 @@ function initMap(){
   if(lmap){lmap.remove();lmap=null;}
   const ctr=pts.length?[pts[0].lat,pts[0].lng]:gps?[gps.lat,gps.lng]:[13.7563,100.5018];
   lmap=L.map('lmap',{zoomControl:false}).setView(ctr,15);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(lmap);
-  L.control.zoom({position:'topright'}).addTo(lmap);
   
-  const mk=(idx, count)=>L.divIcon({
-    html:`<div style="background:#00e5b0;color:#000;font-size:9px;font-weight:700;font-family:monospace;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.6);position:relative;">
-            <span style="transform:rotate(45deg)">${idx+1}</span>
-            ${count > 1 ? `<div style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border-radius:50%;width:14px;height:14px;font-size:8px;display:flex;align-items:center;justify-content:center;transform:rotate(45deg);border:1px solid #fff;">${count}</div>` : ''}
-          </div>`,
-    className:'',iconSize:[26,26],iconAnchor:[13,26]
+  // Dark tile layer ดูเข้ากับ UI มากขึ้น
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'© OSM © CARTO',maxZoom:19
+  }).addTo(lmap);
+  L.control.zoom({position:'topright'}).addTo(lmap);
+
+  // สร้าง marker cluster group
+  const cluster = L.markerClusterGroup({
+    showCoverageOnHover: false,
+    maxClusterRadius: 50,
+    spiderfyOnMaxZoom: true,
+    iconCreateFunction: function(c) {
+      const n = c.getChildCount();
+      return L.divIcon({
+        html: `<div style="background:rgba(0,229,176,0.9);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:monospace;font-size:13px;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,229,176,.5);">${n}</div>`,
+        className: '', iconSize: [36,36], iconAnchor:[18,18]
+      });
+    }
   });
 
+  // จัดกลุ่มพิกัดซ้ำ (ถ่ายหลายรูปที่เดียวกัน)
   const groupedPts = {};
   pts.forEach((p, i) => {
     const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
     if(!groupedPts[key]) groupedPts[key] = [];
-    groupedPts[key].push({ p: p, originalIndex: i });
+    groupedPts[key].push({ p, originalIndex: i });
   });
 
   Object.values(groupedPts).forEach(group => {
@@ -1207,35 +1335,36 @@ function initMap(){
     const count = group.length;
     const latestIdx = group[0].originalIndex;
 
-    let popupHtml = `<div class="map-popup-scroll" style="font-family:monospace;font-size:11px;min-width:160px;max-height:260px;overflow-y:auto;padding-right:6px;">`;
-    
-    if (count > 1) {
-      popupHtml += `<div style="margin-bottom:8px;background:rgba(0,229,176,0.15);color:#00e5b0;padding:4px 8px;border-radius:4px;text-align:center;font-weight:bold;">จุดนี้มีทั้งหมด ${count} รูปภาพ</div>`;
-    }
-
-    group.forEach((item, groupIdx) => {
-      const p = item.p;
-      const oIdx = item.originalIndex;
-      const d = new Date(p.dt);
-      
-      popupHtml += `
-        <div style="${groupIdx < count - 1 ? 'border-bottom:1px solid #ccc;margin-bottom:10px;padding-bottom:10px;' : 'margin-bottom:6px;'}">
-          <img src="${p.uploaded && p.dataURL && p.dataURL.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL}" style="width:100%;border-radius:4px;margin-bottom:6px;display:block;">
-          <b style="color:#00e5b0;font-size:12px;">ภาพที่ ${oIdx+1} ${p.uploaded ? '✅' : '☁️'}</b><br>
-          ${fD(d)} ${fT(d)}<br>
-          ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
-        </div>
-      `;
+    const icon = L.divIcon({
+      html: `<div class="survey-marker ${count>1?'multi':''}"><span>${latestIdx+1}</span></div>`,
+      className: '', iconSize:[30,30], iconAnchor:[15,30]
     });
 
-    popupHtml += `<div style="margin-top:8px;text-align:center;"><a href="https://maps.google.com/?q=${firstP.lat},${firstP.lng}" target="_blank" style="color:#60a5fa;text-decoration:none;font-weight:bold;display:block;background:rgba(59,130,246,0.1);padding:6px;border-radius:6px;border:1px solid rgba(59,130,246,0.3);">🗺 เปิดแผนที่ Google Maps</a></div>`;
-    popupHtml += `</div>`;
-
-    L.marker([firstP.lat, firstP.lng], {icon: mk(latestIdx, count)}).addTo(lmap).bindPopup(popupHtml);
+    const marker = L.marker([firstP.lat, firstP.lng], {icon});
+    marker.bindPopup(buildPopupHtml(group, 0), {maxWidth:240, minWidth:220});
+    marker.on('popupopen', () => {
+      _popupGroup = group;
+      _popupIdx = 0;
+      _activeMarker = marker;
+    });
+    marker.on('popupclose', () => { _activeMarker = null; });
+    cluster.addLayer(marker);
   });
 
-  if(pts.length>1){const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.6,dashArray:'4 6'}).addTo(lmap);lmap.fitBounds(ln.getBounds(),{padding:[30,30]});}
-  if(gps) L.circleMarker([gps.lat,gps.lng],{radius:9,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.5,weight:2}).addTo(lmap).bindPopup('ตำแหน่งปัจจุบัน');
+  lmap.addLayer(cluster);
+
+  // เส้นเชื่อมจุดสำรวจ
+  if(pts.length>1){
+    const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.5,dashArray:'5 8'}).addTo(lmap);
+    lmap.fitBounds(ln.getBounds(),{padding:[40,40]});
+  }
+  
+  // ตำแหน่งปัจจุบัน
+  if(gps) {
+    L.circleMarker([gps.lat,gps.lng],{
+      radius:10,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.4,weight:3
+    }).addTo(lmap).bindPopup('<div style="font-family:monospace;font-size:11px;color:#60a5fa">📍 ตำแหน่งของคุณ</div>');
+  }
   
   document.getElementById('offline-status').textContent=navigator.onLine?'online':'📴 offline';
 }
