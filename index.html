@@ -259,7 +259,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 </style>
 </head>
 <body>
-<div id="splash"><div class="sring"></div><div class="stxt">SURVEYCAM PRO</div></div>
+<div id="splash"><div class="sring"></div><div class="stxt">กำลังเชื่อมต่อฐานข้อมูล...</div></div>
 
 <div id="app">
 
@@ -279,7 +279,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
       <div id="meter"><div id="mfill"></div></div>
       <div id="hud">
         <div class="hrow">
-          <div class="badge"><span class="dot"></span>SURVEYCAM</div>
+          <div class="badge"><span class="dot"></span>SURVEYCAM (CLOUD)</div>
           <div id="hgps" class="warn">GPS...</div>
           <div id="hclock">--:--:--</div>
         </div>
@@ -331,7 +331,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 
   <!-- SETTINGS -->
   <div id="pg-settings" class="page">
-    <div class="ph"><span class="pt">⚙ ตั้งค่า</span><button class="bk" onclick="goBack()">← กลับ</button></div>
+    <div class="ph"><span class="pt">⚙ ตั้งค่า (บันทึกลง Cloud)</span><button class="bk" onclick="goBack()">← กลับ</button></div>
     <div class="set-body">
       <div class="set-sec">
         <div class="set-title">กล้อง</div>
@@ -392,21 +392,9 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
       </div>
 
       <div class="set-sec">
-        <div class="set-title">แผนที่ offline</div>
+        <div class="set-title">ข้อมูลบน Cloud</div>
         <div class="set-row">
-          <div><div class="set-lbl">Cache แผนที่ตำแหน่งปัจจุบัน</div><div class="set-sub">บันทึกไว้ใช้ตอนไม่มีเน็ต</div></div>
-          <button onclick="cacheMapArea()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--ag);
-            background:var(--ad);color:var(--ac);font-family:var(--fn);font-size:10px;cursor:pointer;">
-            ⬇ Cache
-          </button>
-        </div>
-        <div class="cache-info" id="cache-info">กำลังตรวจสอบ cache...</div>
-      </div>
-
-      <div class="set-sec">
-        <div class="set-title">ข้อมูล</div>
-        <div class="set-row">
-          <div><div class="set-lbl">ลบรูปทั้งหมด</div><div class="set-sub" id="photo-count-info">-- รูป</div></div>
+          <div><div class="set-lbl">ลบรูประบบทั้งหมด</div><div class="set-sub" id="photo-count-info">-- รูป</div></div>
           <button onclick="clearAll()" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);
             background:transparent;color:var(--dn);font-family:var(--fn);font-size:10px;cursor:pointer;">ลบทั้งหมด</button>
         </div>
@@ -417,7 +405,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
   <!-- PHOTOS -->
   <div id="pg-photos" class="page">
     <div class="ph">
-      <span class="pt">รูปภาพทั้งหมด <button class="bk" style="margin-left:8px;" onclick="syncAllUnuploaded()">☁️ Sync ที่ค้าง</button></span>
+      <span class="pt">รูปภาพบน Cloud <button class="bk" style="margin-left:8px;" onclick="syncAllUnuploaded()">☁️ ส่งรูปที่ค้าง</button></span>
       <button class="bk" onclick="goBack()">← กลับ</button>
     </div>
     <div id="pgrid"></div>
@@ -441,7 +429,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
         <tr><td class="lb">โครงการ</td><td class="vl" id="viproj">--</td></tr>
       </table>
       <div class="arow">
-        <button class="ab pr" onclick="uploadToCloud()" id="btn-upcloud">☁️ อัปโหลดใหม่</button>
+        <button class="ab pr" onclick="uploadToCloud()" id="btn-upcloud">☁️ อัปโหลดซ้ำ</button>
         <button class="ab pr" onclick="saveGal()">⬇ บันทึก</button>
         <button class="ab" onclick="showQR()">▦ QR</button>
         <button class="ab gm" onclick="openGM()">🗺 Maps</button>
@@ -456,7 +444,6 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
     <div class="ph"><span class="pt">แผนที่สำรวจ</span><button class="bk" onclick="goBack()">← กลับ</button></div>
     <div id="mcon">
       <div id="lmap"></div>
-      <button id="mcache-btn" onclick="cacheCurrentView()">⬇ Cache พื้นที่นี้</button>
       <div class="mleg"><b id="mcount">0</b> จุด · <span id="offline-status">online</span></div>
     </div>
   </div>
@@ -484,21 +471,18 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ================================================================
-   STATE & SETTINGS
+   STATE & SETTINGS (Memory Only - No LocalStorage)
 ================================================================ */
-const KEY = 'scam5';
-const SETKEY = 'scam5_set';
 let photos = [], gps = null, bestGps = null, gpsHist = [];
 let facing = 'environment', stream = null, zLv = 1, zCaps = null;
 let stack = [], vIdx = -1, lmap = null;
 let timerRunning = false, lockPending = false;
 
-// ใส่ URL ของ Google Apps Script ของคุณตรงนี้
+// URL ของ Google Apps Script เป็น Database หลัก
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwB__JHwqwPJgbk619CXevuQj8qEnkDyhcal8J1AdPnlGRJtoHQHfkVbPv5zM2MF3xIgQ/exec';
 
+// ค่าเริ่มต้น
 let cfg = { grid:false, timer:0, res:'4k', gpsThresh:15, qr:false, project:'' };
-try { cfg = {...cfg, ...JSON.parse(localStorage.getItem(SETKEY)||'{}')}; } catch(e){}
-try { photos = JSON.parse(localStorage.getItem(KEY)||'[]'); } catch(e){ photos=[]; }
 
 const resMap = {
   '4k': {width:{ideal:4096},height:{ideal:2160}},
@@ -519,16 +503,52 @@ function toast(msg,type=''){
   t.textContent=msg; t.className='show'+(type?' '+type:'');
   clearTimeout(t._t); t._t=setTimeout(()=>t.className='',2800);
 }
-function saveDB(){
-  try{localStorage.setItem(KEY,JSON.stringify(photos));}
-  catch(e){while(photos.length>80)photos.pop();try{localStorage.setItem(KEY,JSON.stringify(photos));}catch(ee){}}
+
+// โหลดข้อมูลจาก Google Apps Script ตอนเปิดแอป
+async function loadDataFromCloud() {
+  if (!navigator.onLine) {
+    toast('ไม่ได้เชื่อมต่ออินเทอร์เน็ต ข้อมูลจะไม่ซิงค์', 'bad');
+    document.getElementById('splash').style.display = 'none';
+    finishInit();
+    return;
+  }
+  
+  try {
+    const res = await fetch(GAS_URL + '?action=getData'); // ต้องมีการทำ GET endpoint ใน GAS
+    if (res.ok) {
+      const data = await res.json();
+      if (data.settings) cfg = { ...cfg, ...data.settings };
+      if (data.photos && Array.isArray(data.photos)) photos = data.photos;
+      toast('ซิงค์ข้อมูลจาก Cloud สำเร็จ', 'ok');
+    }
+  } catch (err) {
+    console.error('Error loading data from cloud:', err);
+    toast('เชื่อมต่อฐานข้อมูลล้มเหลว (ทำงานแบบออฟไลน์ชั่วคราว)', 'bad');
+  } finally {
+    document.getElementById('splash').style.display = 'none';
+    finishInit();
+  }
 }
-function saveSetting(k,v){ cfg[k]=v; localStorage.setItem(SETKEY,JSON.stringify(cfg)); }
+
+// ส่งการตั้งค่าไปบันทึกที่ Cloud
+function saveSetting(k,v){ 
+  cfg[k]=v; 
+  if(navigator.onLine) {
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'saveSetting', key: k, value: v }),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    }).catch(e => console.error(e));
+  }
+}
+
 function togSetting(k){
-  cfg[k]=!cfg[k]; saveSetting(k,cfg[k]);
+  cfg[k]=!cfg[k]; 
+  saveSetting(k, cfg[k]);
   document.getElementById('tog-'+k).classList.toggle('on',cfg[k]);
   if(k==='grid') document.getElementById('grid-overlay').classList.toggle('show',cfg[k]);
 }
+
 function updCnt(){
   const n=photos.length;
   document.getElementById('ncount').textContent=n;
@@ -538,7 +558,8 @@ function updCnt(){
   const pi=document.getElementById('photo-count-info');
   if(pi) pi.textContent=n+' รูป';
 }
-function loadSettings(){
+
+function loadSettingsUI(){
   document.getElementById('tog-grid').classList.toggle('on',cfg.grid);
   document.getElementById('tog-qr').classList.toggle('on',cfg.qr);
   document.getElementById('sel-timer').value=cfg.timer;
@@ -556,7 +577,6 @@ function goPg(name){
   document.getElementById('pg-'+name)?.classList.add('active');
   if(name==='photos') renderPhotos();
   if(name==='map') initMap();
-  if(name==='settings') updateCacheInfo();
 }
 function goBack(){
   if(!stack.length) return;
@@ -658,7 +678,7 @@ function startTimerOrCapture(){
 }
 
 /* ================================================================
-   CAPTURE & AUTO UPLOAD
+   CAPTURE & AUTO UPLOAD TO CLOUD
 ================================================================ */
 function doCapture(){
   const v=document.getElementById('video');
@@ -731,22 +751,28 @@ function doCapture(){
   const url=cv.toDataURL('image/jpeg',0.92);
   const entry={id:Date.now(),dataURL:url,
     lat:ug?.lat??null,lng:ug?.lng??null,alt:ug?.alt??null,acc:ug?.acc??null,
-    dt:now.toISOString(),project:cfg.project||'', uploaded: false}; // เพิ่มสถานะ uploaded
-  photos.unshift(entry); saveDB(); updCnt();
-  toast(ug?`✓ บันทึกแล้ว · GPS ±${Math.round(ug.acc)}m`:'✓ บันทึกแล้ว (ไม่มี GPS)','ok');
+    dt:now.toISOString(),project:cfg.project||'', uploaded: false}; 
+    
+  photos.unshift(entry); // เก็บใน Memory (RAM) เท่านั้น
+  updCnt();
+  toast(ug?`✓ ถ่ายภาพแล้ว · GPS ±${Math.round(ug.acc)}m`:'✓ ถ่ายภาพแล้ว (ไม่มี GPS)','ok');
 
-  // ทำการอัปโหลดอัตโนมัติทันทีที่บันทึกรูปเสร็จ
+  // ทำการอัปโหลดอัตโนมัติทันที
   autoUploadCurrentPhoto(entry);
 }
 
-// ฟังก์ชันสำหรับส่งขึ้น Cloud อัตโนมัติ (ทำงานอยู่เบื้องหลัง)
+// อัปโหลดขึ้น Cloud (แทนการบันทึกลง LocalStorage)
 async function autoUploadCurrentPhoto(p) {
-  if(!navigator.onLine) return; // ถ้าไม่มีเน็ต ให้ข้ามไปก่อน
+  if(!navigator.onLine) {
+    toast('ไม่มีเน็ต รูปจะอยู่ในหน่วยความจำเครื่องชั่วคราวเท่านั้น', 'bad');
+    return;
+  }
   
   const d = new Date(p.dt);
   const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
 
   const payload = {
+    action: 'uploadPhoto', // กำหนด Action ให้แน่ชัดสำหรับ GAS
     id: p.id,
     dataURL: p.dataURL,
     filename: fname,
@@ -755,7 +781,7 @@ async function autoUploadCurrentPhoto(p) {
   };
 
   try {
-    toast('☁️ กำลังส่งข้อมูลขึ้นคลาวด์...', 'ok');
+    toast('☁️ กำลังซิงค์ขึ้น Cloud...', 'ok');
     const res = await fetch(GAS_URL, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -763,26 +789,23 @@ async function autoUploadCurrentPhoto(p) {
     });
     const result = await res.json();
     if (result.status === 'success') {
-      toast('✓ อัปโหลดรูปล่าสุดสำเร็จ!', 'ok');
-      // อัปเดตสถานะใน array
+      toast('✓ บันทึกลง Cloud สำเร็จ!', 'ok');
       const idx = photos.findIndex(img => img.id === p.id);
       if(idx !== -1) {
         photos[idx].uploaded = true;
-        saveDB();
-        // ถ้าผู้ใช้อยู่หน้าแกลเลอรี่ให้รีเฟรชหน้าตา
         if(document.getElementById('pg-photos').classList.contains('active')) renderPhotos();
       }
     }
   } catch (err) {
     console.error('Auto upload failed:', err);
+    toast('❌ ซิงค์ข้อมูลล้มเหลว', 'bad');
   }
 }
 
-// ฟังก์ชันสำหรับส่งขึ้นทีละหลายๆ รูปที่ยังไม่ได้ส่ง (เผื่อตอนไม่มีเน็ต)
 async function syncAllUnuploaded() {
   const unuploaded = photos.filter(p => !p.uploaded);
   if(unuploaded.length === 0) {
-    toast('รูปทั้งหมดถูกอัปโหลดขึ้นคลาวด์แล้ว ✅', 'ok');
+    toast('รูปทั้งหมดถูกอัปโหลดขึ้น Cloud แล้ว ✅', 'ok');
     return;
   }
   if(!navigator.onLine) {
@@ -798,7 +821,11 @@ async function syncAllUnuploaded() {
     const d = new Date(p.dt);
     const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
 
-    const payload = { id: p.id, dataURL: p.dataURL, filename: fname, lat: p.lat || '', lng: p.lng || '', alt: p.alt || '', acc: p.acc || '', dt: p.dt, project: p.project || '' };
+    const payload = { 
+      action: 'uploadPhoto',
+      id: p.id, dataURL: p.dataURL, filename: fname, 
+      lat: p.lat || '', lng: p.lng || '', alt: p.alt || '', acc: p.acc || '', dt: p.dt, project: p.project || '' 
+    };
 
     try {
       const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }});
@@ -806,12 +833,11 @@ async function syncAllUnuploaded() {
       if(result.status === 'success') {
         const idx = photos.findIndex(img => img.id === p.id);
         if(idx !== -1) photos[idx].uploaded = true;
-        saveDB();
-        renderPhotos(); // อัปเดต UI ทันที
+        renderPhotos(); 
       }
     } catch(err) {
       toast(`อัปโหลดล้มเหลวที่รูป ${i+1}`, 'bad');
-      break; // หยุดถ้าเจอ error กลางทาง (เช่นเน็ตหลุด)
+      break; 
     }
   }
   toast('ดำเนินการ Sync เสร็จสิ้น', 'ok');
@@ -822,10 +848,9 @@ async function syncAllUnuploaded() {
 ================================================================ */
 function renderPhotos(){
   const g=document.getElementById('pgrid');
-  if(!photos.length){g.innerHTML='<div class="emp">📷<br><br>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';return;}
+  if(!photos.length){g.innerHTML='<div class="emp">📷<br><br>ยังไม่มีรูปภาพ หรือยังไม่ได้ซิงค์จาก Cloud<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';return;}
   g.innerHTML=photos.map((p,i)=>{
     const d=new Date(p.dt);
-    // เพิ่ม Badge โชว์สถานะ
     const syncBadge = `<div class="p-sync ${p.uploaded ? 'ok' : ''}">${p.uploaded ? '✅' : '☁️'}</div>`;
     return `<div class="pc" onclick="openV(${i})">
       ${syncBadge}
@@ -852,14 +877,13 @@ function openV(i){
   document.getElementById('vidt').textContent=fD(d);
   document.getElementById('viproj').textContent=p.project||'-';
   
-  // จัดการปุ่มอัปโหลด ให้แสดงสถานะตามรูปที่เปิด
   const btn = document.getElementById('btn-upcloud');
   if (p.uploaded) {
     btn.textContent = '✅ อัปโหลดแล้ว';
     btn.disabled = true;
     btn.style.pointerEvents = 'none';
   } else {
-    btn.textContent = '☁️ อัปโหลดขึ้นคลาวด์';
+    btn.textContent = '☁️ อัปโหลดขึ้น Cloud';
     btn.disabled = false;
     btn.style.pointerEvents = 'auto';
   }
@@ -930,17 +954,41 @@ async function shareP(){
 
 function delP(){
   if(vIdx<0)return;
-  if(!confirm('ลบรูปนี้?'))return;
-  photos.splice(vIdx,1); saveDB(); updCnt(); goBack(); toast('ลบแล้ว');
+  if(!confirm('ลบรูปนี้? ระบบจะส่งคำสั่งลบไปยัง Cloud ด้วย'))return;
+  
+  const pId = photos[vIdx].id;
+  photos.splice(vIdx,1); 
+  updCnt(); 
+  goBack(); 
+  toast('ลบออกจากหน่วยความจำแล้ว');
+
+  // ส่งคำสั่งลบไปยัง Cloud
+  if(navigator.onLine) {
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'deletePhoto', id: pId }),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
+  }
 }
 
 function clearAll(){
-  if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป?`))return;
-  photos=[]; saveDB(); updCnt(); toast('ลบทั้งหมดแล้ว');
+  if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป? ระบบจะส่งคำสั่งล้างข้อมูลใน Cloud ด้วย`))return;
+  photos=[]; 
+  updCnt(); 
+  toast('ล้างข้อมูลทั้งหมดแล้ว');
+
+  if(navigator.onLine) {
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'deleteAllPhotos' }),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
+  }
 }
 
 /* ================================================================
-   MANUAL CLOUD UPLOAD (Google Drive & Sheets)
+   MANUAL CLOUD UPLOAD
 ================================================================ */
 async function uploadToCloud() {
   if (vIdx < 0) return;
@@ -951,6 +999,7 @@ async function uploadToCloud() {
   const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
 
   const payload = {
+    action: 'uploadPhoto',
     id: p.id, dataURL: p.dataURL, filename: fname,
     lat: p.lat || '', lng: p.lng || '', alt: p.alt || '', acc: p.acc || '',
     dt: p.dt, project: p.project || ''
@@ -972,10 +1021,7 @@ async function uploadToCloud() {
     if (result.status === 'success') {
       toast('✓ อัปโหลดขึ้น Cloud สำเร็จ!', 'ok');
       btn.textContent = '✅ อัปโหลดแล้ว';
-      
-      // Update state in main array
       photos[vIdx].uploaded = true;
-      saveDB();
     } else {
       toast('❌ อัปโหลดล้มเหลว: ' + result.message, 'bad');
       btn.textContent = '☁️ ลองใหม่';
@@ -990,10 +1036,10 @@ async function uploadToCloud() {
 }
 
 /* ================================================================
-   PDF REPORT
+   PDF REPORT & CSV
 ================================================================ */
 async function genPDF(){
-  if(!photos.length){toast('ยังไม่มีรูปภาพ','bad');return;}
+  if(!photos.length){toast('ยังไม่มีรูปภาพในหน่วยความจำ','bad');return;}
   const modal=document.getElementById('pdf-modal');
   const status=document.getElementById('pdf-status');
   const fill=document.getElementById('pdf-prog-fill');
@@ -1094,9 +1140,6 @@ async function genPDF(){
   setTimeout(()=>{ modal.classList.remove('show'); toast('📊 PDF Report พร้อมแล้ว!','ok'); },800);
 }
 
-/* ================================================================
-   CSV
-================================================================ */
 function doCSV(){
   if(!photos.length){toast('ยังไม่มีรูปภาพ','bad');return;}
   const rows=[['no','project','datetime_iso','date_th','time','lat','lng','altitude_m','accuracy_m','google_maps_url']];
@@ -1112,7 +1155,7 @@ function doCSV(){
 }
 
 /* ================================================================
-   MAP + OFFLINE CACHE + CLUSTERING (อัปเดตให้รัศมีฉลาดขึ้น)
+   MAP
 ================================================================ */
 function initMap(){
   const pts=photos.filter(p=>p.lat);
@@ -1132,16 +1175,13 @@ function initMap(){
     className:'',iconSize:[26,26],iconAnchor:[13,26]
   });
 
-  // จัดกลุ่มรูปที่มีพิกัดเดียวกัน (ปัดเศษทศนิยมเหลือ 4 ตำแหน่ง = รัศมีประมาณ 11 เมตร)
   const groupedPts = {};
   pts.forEach((p, i) => {
-    // 4 decimal places gives a resolution of ~11.1 meters (perfect for grouping nearby shots)
     const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
     if(!groupedPts[key]) groupedPts[key] = [];
     groupedPts[key].push({ p: p, originalIndex: i });
   });
 
-  // สร้าง Marker จากกลุ่มของรูป
   Object.values(groupedPts).forEach(group => {
     const firstP = group[0].p;
     const count = group.length;
@@ -1180,82 +1220,24 @@ function initMap(){
   document.getElementById('offline-status').textContent=navigator.onLine?'online':'📴 offline';
 }
 
-function getTilesInBounds(bounds, zoom){
-  const tiles=[];
-  const lat2tile=lat=>Math.floor((1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*Math.pow(2,zoom));
-  const lon2tile=lon=>Math.floor((lon+180)/360*Math.pow(2,zoom));
-  const x1=lon2tile(bounds.getWest()), x2=lon2tile(bounds.getEast());
-  const y1=lat2tile(bounds.getNorth()), y2=lat2tile(bounds.getSouth());
-  for(let x=x1;x<=x2;x++) for(let y=y1;y<=y2;y++) tiles.push(`https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`);
-  return tiles;
-}
-
-async function cacheCurrentView(){
-  if(!lmap){toast('เปิดแผนที่ก่อน','bad');return;}
-  const bounds=lmap.getBounds();
-  let allTiles=[];
-  for(let z=10;z<=17;z++) allTiles=[...allTiles,...getTilesInBounds(bounds,z)];
-  allTiles=allTiles.slice(0,500);
-  toast(`กำลัง cache ${allTiles.length} tiles...`);
-  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
-    const mc=new MessageChannel();
-    mc.port1.onmessage=e=>{ if(e.data.ok) toast(`✓ Cache ${e.data.count} tiles เสร็จแล้ว`,'ok'); };
-    navigator.serviceWorker.controller.postMessage({type:'CACHE_TILES',tiles:allTiles},[mc.port2]);
-  } else {
-    let ok=0;
-    for(const url of allTiles.slice(0,100)){try{await fetch(url);ok++;}catch(e){}}
-    toast(`✓ Cache ${ok} tiles เสร็จ`,'ok');
-  }
-}
-
-async function cacheMapArea(){
-  if(!gps){toast('ต้องมี GPS ก่อน','bad');return;}
-  const bounds=L.latLng(gps.lat,gps.lng).toBounds(2000);
-  let tiles=[];
-  for(let z=12;z<=17;z++) tiles=[...tiles,...getTilesInBounds(bounds,z)];
-  tiles=tiles.slice(0,300);
-  toast(`กำลัง cache ${tiles.length} tiles บริเวณนี้...`);
-  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
-    const mc=new MessageChannel();
-    mc.port1.onmessage=e=>{ if(e.data.ok){toast(`✓ Cache ${e.data.count} tiles เสร็จ`,'ok');updateCacheInfo();} };
-    navigator.serviceWorker.controller.postMessage({type:'CACHE_TILES',tiles},[mc.port2]);
-  }
-}
-
-async function updateCacheInfo(){
-  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
-    const mc=new MessageChannel();
-    mc.port1.onmessage=e=>{
-      const ci=document.getElementById('cache-info');
-      if(ci) ci.textContent=`tiles ที่ cache ไว้: ${e.data.count} แผ่น · ใช้งาน offline ได้`;
-    };
-    navigator.serviceWorker.controller.postMessage({type:'TILE_CACHE_SIZE'},[mc.port2]);
-  }
-}
-
-/* ================================================================
-   SERVICE WORKER
-================================================================ */
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js')
-    .then(()=>{ setTimeout(updateCacheInfo,1000); })
-    .catch(()=>{});
-}
-
 window.addEventListener('online',()=>{ document.getElementById('offline-status').textContent='online'; toast('กลับมา online แล้ว'); });
 window.addEventListener('offline',()=>{ document.getElementById('offline-status').textContent='📴 offline'; toast('อยู่ในโหมด offline','bad'); });
 
 /* ================================================================
-   INIT
+   INIT SEQUENCE
 ================================================================ */
-window.addEventListener('load',()=>{
-  document.getElementById('splash').style.display='none';
-  loadSettings();
+window.addEventListener('load', () => {
+  // เริ่มต้นกระบวนการโหลดข้อมูลจาก Cloud แทน LocalStorage
+  loadDataFromCloud();
+});
+
+function finishInit() {
+  loadSettingsUI();
   startCam('environment');
   startGPS();
   startClock();
   updCnt();
-});
+}
 </script>
 </body>
 </html>
