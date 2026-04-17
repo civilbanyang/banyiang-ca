@@ -1017,17 +1017,20 @@ async function shareP(){
   saveGal();
 }
 
+function extractDriveFileId(url) {
+  if(!url || !url.includes('drive.google.com')) return null;
+  // รองรับทั้ง: uc?export=view&id=XXX  และ  thumbnail?id=XXX  และ  /d/XXX/
+  const m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/) || url.match(/\/d\/([a-zA-Z0-9_-]{10,})\//);
+  return m ? m[1] : null;
+}
+
 function delP(){
   if(vIdx<0)return;
   if(!confirm('ลบรูปนี้? ระบบจะลบทั้งข้อมูลใน Sheet และไฟล์รูปใน Drive'))return;
   
   const photo = photos[vIdx];
   const pId = photo.id;
-  let driveFileId = null;
-  if(photo.dataURL && photo.dataURL.includes('drive.google.com')) {
-    const m = photo.dataURL.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if(m) driveFileId = m[1];
-  }
+  const driveFileId = extractDriveFileId(photo.dataURL);
 
   photos.splice(vIdx,1); 
   updCnt(); 
@@ -1050,13 +1053,7 @@ function delP(){
 
 function clearAll(){
   if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป? ระบบจะลบทั้ง Sheet และไฟล์รูปใน Drive`))return;
-  const driveFileIds = photos.map(p => {
-    if(p.dataURL && p.dataURL.includes('drive.google.com')) {
-      const m = p.dataURL.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      return m ? m[1] : null;
-    }
-    return null;
-  }).filter(Boolean);
+  const driveFileIds = photos.map(p => extractDriveFileId(p.dataURL)).filter(Boolean);
 
   photos=[]; 
   updCnt(); 
@@ -1244,71 +1241,79 @@ function doCSV(){
 /* ================================================================
    MAP
 ================================================================ */
-// State สำหรับ popup navigation
-let _popupGroup = [], _popupIdx = 0;
+// ── MAP POPUP STATE ──────────────────────────────────────────────
+let _popupGroups = {};   // markerID → group array
+let _popupIdxMap = {};   // markerID → current index
 
-function buildPopupHtml(group, activeIdx) {
-  const item = group[activeIdx];
+function getImgSrc(p) {
+  return p.uploaded && p.dataURL && p.dataURL.startsWith('http')
+    ? getDriveImgUrl(p.dataURL) : p.dataURL;
+}
+
+function renderPopupInto(el, group, idx) {
+  const item = group[idx];
   const p = item.p;
-  const oIdx = item.originalIndex;
   const d = new Date(p.dt);
-  const imgSrc = p.uploaded && p.dataURL && p.dataURL.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
   const count = group.length;
+  const imgSrc = getImgSrc(p);
 
   let html = '';
   if(count > 1) {
-    html += `<div class="pop-multi-header">📍 จุดนี้มีทั้งหมด ${count} ภาพ · ดูภาพที่ ${activeIdx+1}/${count}</div>`;
+    html += `<div class="pop-multi-header">📍 ${count} ภาพในจุดนี้ · ภาพที่ ${idx+1}/${count}</div>`;
   }
   html += `<img class="pop-img" src="${imgSrc}" onerror="this.style.opacity=0.3">`;
   html += `<div class="pop-wrap">`;
   html += `<div class="pop-badge">
-    <span class="pop-num">📷 ภาพที่ ${oIdx+1}</span>
+    <span class="pop-num">📷 #${item.originalIndex+1}</span>
     <span class="pop-sync">${p.uploaded ? '✅' : '☁️'}</span>
   </div>`;
   html += `<div class="pop-row">🕐 <b>${fD(d)} ${fT(d)}</b></div>`;
   if(p.lat) html += `<div class="pop-row">📍 <b>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</b></div>`;
-  if(p.acc) html += `<div class="pop-row">🎯 ความแม่น <b>±${Math.round(p.acc)} m</b></div>`;
-  if(p.alt) html += `<div class="pop-row">⬆️ ความสูง <b>${p.alt.toFixed(1)} m</b></div>`;
+  if(p.acc) html += `<div class="pop-row">🎯 ±<b>${Math.round(p.acc)} m</b></div>`;
+  if(p.alt) html += `<div class="pop-row">⬆️ <b>${p.alt.toFixed(1)} m</b></div>`;
   if(p.project) html += `<div class="pop-row">🏗 <b>${p.project}</b></div>`;
-  
+  if(p.lat) html += `<hr class="pop-divider"><a class="pop-btn" href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank">🗺 เปิด Google Maps</a>`;
+
   if(count > 1) {
     html += `<div class="pop-nav">
-      <button class="pop-nav-btn" onclick="mapPopNav(-1)" ${activeIdx===0?'disabled style="opacity:.4"':''}>◀ ก่อนหน้า</button>
-      <button class="pop-nav-btn" onclick="mapPopNav(1)" ${activeIdx===count-1?'disabled style="opacity:.4"':''}>ถัดไป ▶</button>
+      <button class="pop-nav-btn" data-dir="-1" ${idx===0?'disabled':''}>${idx===0?'<span style="opacity:.3">◀</span>':'◀'} ก่อนหน้า</button>
+      <button class="pop-nav-btn" data-dir="1" ${idx===count-1?'disabled':''}>${idx===count-1?'ถัดไป <span style="opacity:.3">▶</span>':'ถัดไป ▶'}</button>
     </div>`;
   }
-
-  if(p.lat) {
-    html += `<hr class="pop-divider">
-    <a class="pop-btn" href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank">🗺 เปิด Google Maps</a>`;
-  }
   html += `</div>`;
-  return html;
-}
 
-let _activeMarker = null;
-function mapPopNav(dir) {
-  _popupIdx = Math.max(0, Math.min(_popupGroup.length - 1, _popupIdx + dir));
-  if(_activeMarker) {
-    _activeMarker.setPopupContent(buildPopupHtml(_popupGroup, _popupIdx));
+  el.innerHTML = html;
+
+  // ผูก event โดยตรงกับ DOM element — ไม่ใช้ onclick string → popup ไม่ปิด
+  if(count > 1) {
+    el.querySelectorAll('.pop-nav-btn').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const dir = parseInt(this.dataset.dir);
+        const mid = el.dataset.mid;
+        const g = _popupGroups[mid];
+        let ni = (_popupIdxMap[mid] || 0) + dir;
+        ni = Math.max(0, Math.min(g.length-1, ni));
+        _popupIdxMap[mid] = ni;
+        renderPopupInto(el, g, ni);
+      });
+    });
   }
 }
 
 function initMap(){
-  const pts=photos.filter(p=>p.lat);
-  document.getElementById('mcount').textContent=pts.length;
-  
+  const pts = photos.filter(p => p.lat);
+  document.getElementById('mcount').textContent = pts.length;
+
   if(lmap){lmap.remove();lmap=null;}
-  const ctr=pts.length?[pts[0].lat,pts[0].lng]:gps?[gps.lat,gps.lng]:[13.7563,100.5018];
-  lmap=L.map('lmap',{zoomControl:false}).setView(ctr,15);
-  
-  // Dark tile layer ดูเข้ากับ UI มากขึ้น
+  const ctr = pts.length ? [pts[0].lat, pts[0].lng] : gps ? [gps.lat, gps.lng] : [13.7563, 100.5018];
+  lmap = L.map('lmap', {zoomControl:false}).setView(ctr, 15);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    attribution:'© OSM © CARTO',maxZoom:19
+    attribution:'© OSM © CARTO', maxZoom:19
   }).addTo(lmap);
   L.control.zoom({position:'topright'}).addTo(lmap);
 
-  // สร้าง marker cluster group
+  // Marker cluster group
   const cluster = L.markerClusterGroup({
     showCoverageOnHover: false,
     maxClusterRadius: 50,
@@ -1316,57 +1321,72 @@ function initMap(){
     iconCreateFunction: function(c) {
       const n = c.getChildCount();
       return L.divIcon({
-        html: `<div style="background:rgba(0,229,176,0.9);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:monospace;font-size:13px;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,229,176,.5);">${n}</div>`,
-        className: '', iconSize: [36,36], iconAnchor:[18,18]
+        html: `<div style="background:rgba(0,229,176,0.92);color:#000;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:monospace;font-size:14px;border:3px solid #fff;box-shadow:0 2px 14px rgba(0,229,176,.55);">${n}</div>`,
+        className:'', iconSize:[38,38], iconAnchor:[19,19]
       });
     }
   });
 
-  // จัดกลุ่มพิกัดซ้ำ (ถ่ายหลายรูปที่เดียวกัน)
-  const groupedPts = {};
+  // ── จัดกลุ่มพิกัด: รูปทุกรูปมี marker ตัวเอง แต่รูปที่ GPS ซ้ำกัน (<3m) จะถูกรวม popup ──
+  // ใช้ distance จริงแทน toFixed เพื่อไม่ตกหล่น
+  const R = 6371000;
+  function dist(a, b) {
+    const dLat = (b[0]-a[0])*Math.PI/180;
+    const dLng = (b[1]-a[1])*Math.PI/180;
+    const s = Math.sin(dLat/2)**2 + Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+  }
+
+  // กลุ่มพิกัด: รวมรูปที่อยู่ภายใน 5 เมตรจากกัน
+  const groups = [];
   pts.forEach((p, i) => {
-    const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
-    if(!groupedPts[key]) groupedPts[key] = [];
-    groupedPts[key].push({ p, originalIndex: i });
+    const coord = [p.lat, p.lng];
+    let found = groups.find(g => dist([g[0].p.lat, g[0].p.lng], coord) < 5);
+    if(found) found.push({ p, originalIndex: i });
+    else groups.push([{ p, originalIndex: i }]);
   });
 
-  Object.values(groupedPts).forEach(group => {
+  groups.forEach((group, gi) => {
     const firstP = group[0].p;
     const count = group.length;
-    const latestIdx = group[0].originalIndex;
+    const mid = 'mk_' + gi;
+    _popupGroups[mid] = group;
+    _popupIdxMap[mid] = 0;
 
     const icon = L.divIcon({
-      html: `<div class="survey-marker ${count>1?'multi':''}"><span>${latestIdx+1}</span></div>`,
-      className: '', iconSize:[30,30], iconAnchor:[15,30]
+      html: `<div class="survey-marker${count>1?' multi':''}"><span>${group[0].originalIndex+1}</span>${count>1?`<div style="position:absolute;top:-5px;right:-5px;background:#f59e0b;color:#000;border-radius:50%;width:15px;height:15px;font-size:8px;display:flex;align-items:center;justify-content:center;border:1px solid #fff;font-weight:700;">${count}</div>`:''}`,
+      className:'', iconSize:[30,30], iconAnchor:[15,30]
     });
 
+    // สร้าง popup container จริง
+    const popEl = document.createElement('div');
+    popEl.dataset.mid = mid;
+    renderPopupInto(popEl, group, 0);
+
+    const popup = L.popup({maxWidth:240, minWidth:220, closeButton:true, autoClose:false})
+      .setContent(popEl);
+
     const marker = L.marker([firstP.lat, firstP.lng], {icon});
-    marker.bindPopup(buildPopupHtml(group, 0), {maxWidth:240, minWidth:220});
+    marker.bindPopup(popup);
     marker.on('popupopen', () => {
-      _popupGroup = group;
-      _popupIdx = 0;
-      _activeMarker = marker;
+      _popupIdxMap[mid] = 0;
+      renderPopupInto(popEl, group, 0);
     });
-    marker.on('popupclose', () => { _activeMarker = null; });
     cluster.addLayer(marker);
   });
 
   lmap.addLayer(cluster);
 
-  // เส้นเชื่อมจุดสำรวจ
-  if(pts.length>1){
-    const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.5,dashArray:'5 8'}).addTo(lmap);
-    lmap.fitBounds(ln.getBounds(),{padding:[40,40]});
+  if(pts.length > 1){
+    const ln = L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.5,dashArray:'5 8'}).addTo(lmap);
+    lmap.fitBounds(ln.getBounds(), {padding:[40,40]});
   }
-  
-  // ตำแหน่งปัจจุบัน
   if(gps) {
-    L.circleMarker([gps.lat,gps.lng],{
-      radius:10,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.4,weight:3
-    }).addTo(lmap).bindPopup('<div style="font-family:monospace;font-size:11px;color:#60a5fa">📍 ตำแหน่งของคุณ</div>');
+    L.circleMarker([gps.lat,gps.lng],{radius:10,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.4,weight:3})
+      .addTo(lmap)
+      .bindPopup('<div style="font-family:monospace;font-size:11px;color:#60a5fa">📍 ตำแหน่งของคุณ</div>');
   }
-  
-  document.getElementById('offline-status').textContent=navigator.onLine?'online':'📴 offline';
+  document.getElementById('offline-status').textContent = navigator.onLine?'online':'📴 offline';
 }
 
 window.addEventListener('online',()=>{ document.getElementById('offline-status').textContent='online'; toast('กลับมา online แล้ว'); });
