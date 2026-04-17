@@ -554,7 +554,12 @@ function updCnt(){
   document.getElementById('ncount').textContent=n;
   const c=document.getElementById('gcnt');
   if(n>0){c.style.display='block';c.textContent=n;}else c.style.display='none';
-  if(n>0){document.getElementById('gthumb').src=photos[0].dataURL;document.getElementById('gthumb').style.display='block';document.getElementById('gicon').style.display='none';}
+  if(n>0){
+    const thumbSrc = photos[0].uploaded && photos[0].dataURL && photos[0].dataURL.startsWith('http') ? getDriveImgUrl(photos[0].dataURL) : photos[0].dataURL;
+    document.getElementById('gthumb').src=thumbSrc;
+    document.getElementById('gthumb').style.display='block';
+    document.getElementById('gicon').style.display='none';
+  }
   const pi=document.getElementById('photo-count-info');
   if(pi) pi.textContent=n+' รูป';
 }
@@ -846,15 +851,29 @@ async function syncAllUnuploaded() {
 /* ================================================================
    PHOTOS LIST
 ================================================================ */
+function getDriveImgUrl(url) {
+  // แปลง drive.google.com/uc?export=view&id=FILE_ID
+  // เป็น drive.google.com/thumbnail?id=FILE_ID&sz=w400
+  // เพื่อหลีกเลี่ยง CORS และ redirect ที่ทำให้ <img> โหลดไม่ได้
+  if (!url) return url;
+  try {
+    const m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+  } catch(e) {}
+  return url;
+}
+
 function renderPhotos(){
   const g=document.getElementById('pgrid');
   if(!photos.length){g.innerHTML='<div class="emp">📷<br><br>ยังไม่มีรูปภาพ หรือยังไม่ได้ซิงค์จาก Cloud<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';return;}
   g.innerHTML=photos.map((p,i)=>{
     const d=new Date(p.dt);
     const syncBadge = `<div class="p-sync ${p.uploaded ? 'ok' : ''}">${p.uploaded ? '✅' : '☁️'}</div>`;
+    const imgSrc = p.uploaded && p.dataURL && p.dataURL.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
     return `<div class="pc" onclick="openV(${i})">
       ${syncBadge}
-      <img src="${p.dataURL}" loading="lazy" alt="">
+      <img src="${imgSrc}" loading="lazy" alt=""
+        onerror="this.onerror=null;this.src='${imgSrc.replace(/'/g,"\\'")}';this.style.opacity='0.4';this.title='โหลดรูปไม่ได้'">
       <div class="pm">
         <div class="pdt">${fD(d)} ${fT(d)}${p.project?' · '+p.project:''}</div>
         <div class="pco">${p.lat?p.lat.toFixed(5)+', '+p.lng.toFixed(5):'ไม่มี GPS'}</div>
@@ -867,7 +886,8 @@ function renderPhotos(){
 ================================================================ */
 function openV(i){
   vIdx=i; const p=photos[i]; const d=new Date(p.dt);
-  document.getElementById('vimg').src=p.dataURL;
+  const vimgSrc = p.uploaded && p.dataURL && p.dataURL.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
+  document.getElementById('vimg').src=vimgSrc;
   document.getElementById('vtit').textContent=`ภาพ ${i+1}/${photos.length}`;
   document.getElementById('vilat').textContent=p.lat?p.lat.toFixed(7)+'°':'ไม่มีข้อมูล';
   document.getElementById('vilng').textContent=p.lng?p.lng.toFixed(7)+'°':'ไม่มีข้อมูล';
@@ -1200,7 +1220,7 @@ function initMap(){
       
       popupHtml += `
         <div style="${groupIdx < count - 1 ? 'border-bottom:1px solid #ccc;margin-bottom:10px;padding-bottom:10px;' : 'margin-bottom:6px;'}">
-          <img src="${p.dataURL}" style="width:100%;border-radius:4px;margin-bottom:6px;display:block;">
+          <img src="${p.uploaded && p.dataURL && p.dataURL.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL}" style="width:100%;border-radius:4px;margin-bottom:6px;display:block;">
           <b style="color:#00e5b0;font-size:12px;">ภาพที่ ${oIdx+1} ${p.uploaded ? '✅' : '☁️'}</b><br>
           ${fD(d)} ${fT(d)}<br>
           ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
