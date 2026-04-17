@@ -381,13 +381,30 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
           <div class="tog" id="tog-qr" onclick="togSetting('qr')"></div>
         </div>
         <div class="set-row">
-          <div><div class="set-lbl">ชื่อโครงการ</div><div class="set-sub">แสดงบน stamp</div></div>
+          <div><div class="set-lbl">โครงการปัจจุบัน</div><div class="set-sub">แสดงบน stamp</div></div>
           <div class="set-ctrl">
-            <input type="text" id="inp-project" placeholder="โครงการ..." 
-              style="background:var(--s3);border:1px solid var(--br2);color:var(--tx);
-              font-family:var(--fn);font-size:10px;padding:5px 8px;border-radius:8px;width:120px;"
-              onchange="saveSetting('project',this.value)">
+            <button onclick="openProjModal(false)"
+              style="background:rgba(0,229,176,.12);border:1px solid rgba(0,229,176,.3);
+              color:#00e5b0;font-family:var(--fn);font-size:10px;padding:6px 12px;
+              border-radius:8px;cursor:pointer;">
+              <span id="inp-project-label">เลือก...</span>
+            </button>
+            <input type="hidden" id="inp-project">
           </div>
+        </div>
+      </div>
+
+      <div class="set-sec">
+        <div class="set-title">โครงการ</div>
+        <div id="proj-set-list"></div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input id="proj-set-inp" type="text" placeholder="เพิ่มโครงการใหม่..."
+            style="flex:1;background:var(--s3);border:1px solid var(--br2);color:var(--tx);
+            font-family:var(--fn);font-size:11px;padding:8px 10px;border-radius:10px;outline:none;">
+          <button onclick="addProjectFromSettings()"
+            style="background:rgba(0,229,176,.15);border:1px solid rgba(0,229,176,.35);
+            color:#00e5b0;font-family:var(--fn);font-size:11px;font-weight:700;
+            padding:8px 14px;border-radius:10px;cursor:pointer;">+ เพิ่ม</button>
         </div>
       </div>
 
@@ -442,12 +459,31 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
   <!-- MAP -->
   <div id="pg-map" class="page">
     <div class="ph"><span class="pt">แผนที่สำรวจ</span><button class="bk" onclick="goBack()">← กลับ</button></div>
-    <div id="mcon">
+    <div id="mcon" style="position:relative;">
+      <div id="map-filter-bar"></div>
       <div id="lmap"></div>
       <div class="mleg"><b id="mcount">0</b> จุด · <span id="offline-status">online</span></div>
     </div>
   </div>
 
+</div>
+
+<!-- PROJECT SELECT MODAL -->
+<div id="proj-modal">
+  <div id="proj-box">
+    <div id="proj-header">
+      <div id="proj-title">📋 เลือกโครงการ</div>
+      <div id="proj-sub">เลือกโครงการที่จะถ่ายภาพ หรือเพิ่มใหม่</div>
+    </div>
+    <div id="proj-list"></div>
+    <div id="proj-add-row">
+      <input id="proj-new-inp" type="text" placeholder="ชื่อโครงการใหม่..." maxlength="60">
+      <button id="proj-add-btn" onclick="addProject()">+ เพิ่ม</button>
+    </div>
+    <div id="proj-actions">
+      <button id="proj-skip" onclick="selectProject(null)">ข้าม (ไม่ระบุโครงการ)</button>
+    </div>
+  </div>
 </div>
 
 <!-- QR MODAL -->
@@ -464,6 +500,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
   <div id="pdf-prog-bar"><div id="pdf-prog-fill"></div></div>
 </div>
 
+<div id="proj-badge" onclick="openProjModal(false)">📋 กำลังโหลด...</div>
 <div id="flash"></div>
 <div id="toast"></div>
 
@@ -513,6 +550,85 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 .pop-multi-header{background:rgba(245,158,11,0.1);border-bottom:1px solid rgba(245,158,11,0.2);
   padding:8px 12px;border-radius:12px 12px 0 0;color:#f59e0b;font-size:10px;font-weight:700;
   text-align:center;letter-spacing:.05em;}
+/* ── PROJECT MODAL ────────────────────────── */
+#proj-modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;
+  display:none;align-items:center;justify-content:center;padding:20px;}
+#proj-modal.show{display:flex;}
+#proj-box{
+  background:#0e1420;border:1px solid rgba(0,229,176,.25);border-radius:20px;
+  width:100%;max-width:380px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.7);}
+#proj-header{
+  background:linear-gradient(135deg,rgba(0,229,176,.12),rgba(59,130,246,.08));
+  padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.06);}
+#proj-title{font-size:16px;font-weight:700;color:#eef2ff;letter-spacing:.05em;margin-bottom:4px;}
+#proj-sub{font-size:11px;color:#64748b;}
+#proj-list{max-height:260px;overflow-y:auto;padding:10px 12px;}
+.proj-item{
+  display:flex;align-items:center;gap:10px;padding:11px 12px;
+  border-radius:12px;margin-bottom:6px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.06);transition:all .15s;}
+.proj-item:active,.proj-item.sel{
+  background:rgba(0,229,176,.12);border-color:rgba(0,229,176,.35);}
+.proj-item-ico{
+  width:34px;height:34px;border-radius:10px;background:rgba(0,229,176,.1);
+  border:1px solid rgba(0,229,176,.2);display:flex;align-items:center;
+  justify-content:center;font-size:16px;flex-shrink:0;}
+.proj-item-info{flex:1;min-width:0;}
+.proj-item-name{font-size:13px;font-weight:600;color:#eef2ff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.proj-item-count{font-size:10px;color:#64748b;margin-top:2px;}
+.proj-item-del{
+  width:28px;height:28px;border-radius:8px;border:none;
+  background:rgba(239,68,68,.08);color:#ef4444;font-size:14px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+#proj-add-row{
+  display:flex;gap:8px;padding:12px 16px;
+  border-top:1px solid rgba(255,255,255,.06);}
+#proj-new-inp{
+  flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  color:#eef2ff;font-family:var(--fn);font-size:12px;padding:9px 12px;
+  border-radius:10px;outline:none;}
+#proj-new-inp:focus{border-color:rgba(0,229,176,.4);}
+#proj-add-btn{
+  background:rgba(0,229,176,.15);border:1px solid rgba(0,229,176,.35);
+  color:#00e5b0;font-family:var(--fn);font-size:11px;font-weight:700;
+  padding:9px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;}
+#proj-actions{padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.06);}
+#proj-skip{
+  width:100%;padding:10px;background:transparent;
+  border:1px solid rgba(255,255,255,.08);color:#64748b;
+  font-family:var(--fn);font-size:11px;border-radius:10px;cursor:pointer;}
+/* current project badge on camera */
+#proj-badge{
+  position:absolute;top:50px;left:50%;transform:translateX(-50%);
+  background:rgba(0,229,176,.15);border:1px solid rgba(0,229,176,.3);
+  color:#00e5b0;font-size:10px;font-weight:700;font-family:var(--fn);
+  padding:4px 12px;border-radius:20px;cursor:pointer;z-index:20;
+  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* ── MAP FILTER BAR ───────────────────────── */
+#map-filter-bar{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  z-index:1000;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;
+  max-width:calc(100% - 80px);padding:0 4px;}
+.mf-chip{
+  background:rgba(14,20,32,.88);border:1px solid rgba(255,255,255,.12);
+  color:#94a3b8;font-family:var(--fn);font-size:10px;font-weight:600;
+  padding:6px 12px;border-radius:20px;cursor:pointer;
+  backdrop-filter:blur(8px);white-space:nowrap;
+  transition:all .15s;max-width:120px;overflow:hidden;text-overflow:ellipsis;}
+.mf-chip.active{
+  background:rgba(0,229,176,.18);border-color:rgba(0,229,176,.5);color:#00e5b0;}
+/* ── SETTINGS: projects section ───────────── */
+.proj-set-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 10px;border-radius:10px;margin-bottom:4px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);}
+.proj-set-name{font-size:12px;color:#eef2ff;flex:1;}
+.proj-set-count{font-size:10px;color:#64748b;margin-right:8px;}
+.proj-set-del{
+  background:transparent;border:none;color:#ef4444;font-size:14px;cursor:pointer;padding:2px 6px;}
 </style>
 <script>
 /* ================================================================
@@ -528,6 +644,8 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwB__JHwqwPJgbk619CXevu
 
 // ค่าเริ่มต้น
 let cfg = { grid:false, timer:0, res:'4k', gpsThresh:15, qr:false, project:'' };
+let projects = []; // ['โครงการ A', 'โครงการ B', ...]
+let mapFilterProject = 'all'; // 'all' หรือ ชื่อโครงการ
 
 const resMap = {
   '4k': {width:{ideal:4096},height:{ideal:2160}},
@@ -562,7 +680,13 @@ async function loadDataFromCloud() {
     const res = await fetch(GAS_URL + '?action=getData'); // ต้องมีการทำ GET endpoint ใน GAS
     if (res.ok) {
       const data = await res.json();
-      if (data.settings) cfg = { ...cfg, ...data.settings };
+      if (data.settings) {
+        cfg = { ...cfg, ...data.settings };
+        // โหลด projects list จาก settings
+        if(data.settings.projects) {
+          try { projects = JSON.parse(data.settings.projects); } catch(e){ projects=[]; }
+        }
+      }
       if (data.photos && Array.isArray(data.photos)) photos = data.photos;
       toast('ซิงค์ข้อมูลจาก Cloud สำเร็จ', 'ok');
     }
@@ -616,7 +740,119 @@ function loadSettingsUI(){
   document.getElementById('sel-res').value=cfg.res;
   document.getElementById('sel-gps').value=cfg.gpsThresh;
   document.getElementById('inp-project').value=cfg.project||'';
+  const lbl=document.getElementById('inp-project-label');
+  if(lbl) lbl.textContent=cfg.project||'เลือก...';
   if(cfg.grid) document.getElementById('grid-overlay').classList.add('show');
+  renderProjBadge();
+  renderProjSetList();
+}
+
+/* ================================================================
+   PROJECT SYSTEM
+================================================================ */
+function renderProjBadge(){
+  const b = document.getElementById('proj-badge');
+  b.textContent = cfg.project ? '📋 '+cfg.project : '📋 เลือกโครงการ...';
+}
+
+function openProjModal(isFirstOpen){
+  const modal = document.getElementById('proj-modal');
+  modal.classList.add('show');
+  renderProjModalList();
+  const inp = document.getElementById('proj-new-inp');
+  inp.value='';
+  // store whether this is first-open startup prompt
+  modal.dataset.firstOpen = isFirstOpen ? '1' : '0';
+}
+
+function renderProjModalList(){
+  const list = document.getElementById('proj-list');
+  if(!projects.length){
+    list.innerHTML='<div style="text-align:center;color:#64748b;font-size:11px;padding:20px 0;">ยังไม่มีโครงการ กรุณาเพิ่มด้านล่าง</div>';
+    return;
+  }
+  list.innerHTML = projects.map(pj => {
+    const cnt = photos.filter(p=>p.project===pj).length;
+    const isCur = cfg.project===pj;
+    return `<div class="proj-item${isCur?' sel':''}" onclick="selectProject('${pj.replace(/'/g,'\'').replace(/"/g,'&quot;')}')">
+      <div class="proj-item-ico">🏗</div>
+      <div class="proj-item-info">
+        <div class="proj-item-name">${pj}</div>
+        <div class="proj-item-count">${cnt} รูป</div>
+      </div>
+      <button class="proj-item-del" onclick="event.stopPropagation();deleteProject('${pj.replace(/'/g,'\'').replace(/"/g,'&quot;')}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function selectProject(name){
+  cfg.project = name || '';
+  saveSetting('project', cfg.project);
+  document.getElementById('proj-modal').classList.remove('show');
+  document.getElementById('inp-project').value = cfg.project;
+  renderProjBadge();
+  toast(name ? '✓ เลือกโครงการ: '+name : 'ไม่ระบุโครงการ', 'ok');
+}
+
+function addProject(){
+  const inp = document.getElementById('proj-new-inp');
+  const name = inp.value.trim();
+  if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
+  if(projects.includes(name)){ toast('มีโครงการนี้แล้ว','bad'); return; }
+  projects.push(name);
+  saveProjectsToCloud();
+  inp.value='';
+  renderProjModalList();
+  renderProjSetList();
+  toast('✓ เพิ่มโครงการ: '+name,'ok');
+}
+
+function addProjectFromSettings(){
+  const inp = document.getElementById('proj-set-inp');
+  const name = inp.value.trim();
+  if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
+  if(projects.includes(name)){ toast('มีโครงการนี้แล้ว','bad'); return; }
+  projects.push(name);
+  saveProjectsToCloud();
+  inp.value='';
+  renderProjSetList();
+  toast('✓ เพิ่มโครงการ: '+name,'ok');
+}
+
+function deleteProject(name){
+  if(!confirm('ลบโครงการ "'+name+'" ออกจากรายการ? (รูปภาพที่ผูกโครงการนี้ไว้จะยังอยู่)')) return;
+  projects = projects.filter(p=>p!==name);
+  if(cfg.project===name){ cfg.project=''; saveSetting('project',''); renderProjBadge(); }
+  saveProjectsToCloud();
+  renderProjModalList();
+  renderProjSetList();
+}
+
+function renderProjSetList(){
+  const el = document.getElementById('proj-set-list');
+  if(!el) return;
+  if(!projects.length){
+    el.innerHTML='<div style="color:#64748b;font-size:11px;padding:8px 2px;">ยังไม่มีโครงการ</div>';
+    return;
+  }
+  el.innerHTML = projects.map(pj=>{
+    const cnt = photos.filter(p=>p.project===pj).length;
+    return `<div class="proj-set-item">
+      <span class="proj-set-name">${pj}</span>
+      <span class="proj-set-count">${cnt} รูป</span>
+      <button class="proj-set-del" onclick="deleteProject('${pj.replace(/'/g,'\'').replace(/"/g,'&quot;')}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function saveProjectsToCloud(){
+  if(navigator.onLine){
+    fetch(GAS_URL,{
+      method:'POST',
+      body: JSON.stringify({action:'saveSetting',key:'projects',value:JSON.stringify(projects)}),
+      headers:{'Content-Type':'text/plain;charset=utf-8'}
+    }).catch(e=>console.error(e));
+  }
 }
 
 /* ================================================================
@@ -1302,8 +1538,29 @@ function renderPopupInto(el, group, idx) {
   }
 }
 
+function renderMapFilterBar(){
+  const bar = document.getElementById('map-filter-bar');
+  if(!bar) return;
+  // รวม project ทั้งหมดที่มีรูปพร้อม GPS
+  const allProjs = [...new Set(photos.filter(p=>p.lat).map(p=>p.project||'ไม่ระบุโครงการ'))];
+  let html = `<span class="mf-chip${mapFilterProject==='all'?' active':''}" onclick="setMapFilter('all')">🗺 ทั้งหมด</span>`;
+  allProjs.forEach(pj=>{
+    const safe = pj.replace(/'/g,"\'").replace(/"/g,'&quot;');
+    html += `<span class="mf-chip${mapFilterProject===pj?' active':''}" onclick="setMapFilter('${safe}')">${pj}</span>`;
+  });
+  bar.innerHTML = html;
+}
+
+function setMapFilter(proj){
+  mapFilterProject = proj;
+  initMap();
+}
+
 function initMap(){
-  const pts = photos.filter(p => p.lat);
+  renderMapFilterBar();
+  const allPts = photos.filter(p => p.lat);
+  const pts = mapFilterProject==='all' ? allPts
+    : allPts.filter(p=>(p.project||'ไม่ระบุโครงการ')===mapFilterProject);
   document.getElementById('mcount').textContent = pts.length;
 
   if(lmap){lmap.remove();lmap=null;}
@@ -1407,6 +1664,8 @@ function finishInit() {
   startGPS();
   startClock();
   updCnt();
+  // แสดง modal เลือกโครงการตอนเปิดแอป
+  setTimeout(()=> openProjModal(true), 600);
 }
 </script>
 </body>
