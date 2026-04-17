@@ -1143,7 +1143,7 @@ async function genPDF(){
     const gmUrl=p.lat?`https://maps.google.com/?q=${p.lat},${p.lng}`:'';
     rows+=`<tr>
       <td>${i+1}</td>
-      <td><img src="${p.dataURL}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;"></td>
+      <td><img src="${p.uploaded&&p.dataURL&&p.dataURL.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;"></td>
       <td>${p.lat?p.lat.toFixed(6)+'\n'+p.lng.toFixed(6):'ไม่มี GPS'}</td>
       <td>${p.alt?p.alt.toFixed(1)+' m':'--'}</td>
       <td>±${p.acc?Math.round(p.acc):'-'} m</td>
@@ -1287,8 +1287,9 @@ function renderPopupInto(el, group, idx) {
   // ผูก event โดยตรงกับ DOM element — ไม่ใช้ onclick string → popup ไม่ปิด
   if(count > 1) {
     el.querySelectorAll('.pop-nav-btn').forEach(btn => {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
+      L.DomEvent.on(btn, 'click', function(e) {
+        L.DomEvent.stopPropagation(e);
+        L.DomEvent.preventDefault(e);
         const dir = parseInt(this.dataset.dir);
         const mid = el.dataset.mid;
         const g = _popupGroups[mid];
@@ -1296,7 +1297,7 @@ function renderPopupInto(el, group, idx) {
         ni = Math.max(0, Math.min(g.length-1, ni));
         _popupIdxMap[mid] = ni;
         renderPopupInto(el, g, ni);
-      });
+      }, btn);
     });
   }
 }
@@ -1363,7 +1364,7 @@ function initMap(){
     popEl.dataset.mid = mid;
     renderPopupInto(popEl, group, 0);
 
-    const popup = L.popup({maxWidth:240, minWidth:220, closeButton:true, autoClose:false})
+    const popup = L.popup({maxWidth:240, minWidth:220, closeButton:true})
       .setContent(popEl);
 
     const marker = L.marker([firstP.lat, firstP.lng], {icon});
