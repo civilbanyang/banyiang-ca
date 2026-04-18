@@ -681,11 +681,16 @@ async function loadDataFromCloud() {
     if (res.ok) {
       const data = await res.json();
       if (data.settings) {
-        cfg = { ...cfg, ...data.settings };
-        // โหลด projects list จาก settings
-        if(data.settings.projects) {
-          try { projects = JSON.parse(data.settings.projects); } catch(e){ projects=[]; }
-        }
+        // parse booleans/numbers correctly
+        cfg.grid      = data.settings.grid === 'true';
+        cfg.qr        = data.settings.qr === 'true';
+        cfg.timer     = parseInt(data.settings.timer) || 0;
+        cfg.gpsThresh = parseInt(data.settings.gpsThresh) || 15;
+        cfg.res       = data.settings.res || '4k';
+        cfg.project   = data.settings.project || '';
+        // โหลด projects list
+        try { projects = data.settings.projects ? JSON.parse(data.settings.projects) : []; }
+        catch(e){ projects=[]; }
       }
       if (data.photos && Array.isArray(data.photos)) photos = data.photos;
       toast('ซิงค์ข้อมูลจาก Cloud สำเร็จ', 'ok');
@@ -699,16 +704,36 @@ async function loadDataFromCloud() {
   }
 }
 
-// ส่งการตั้งค่าไปบันทึกที่ Cloud
-function saveSetting(k,v){ 
-  cfg[k]=v; 
-  if(navigator.onLine) {
-    fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'saveSetting', key: k, value: v }),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    }).catch(e => console.error(e));
-  }
+// ── บันทึกการตั้งค่าทั้งหมดลง Sheet "ตั้งค่า" ────────────────────
+let _saveTimer = null;
+function saveSetting(k, v){
+  cfg[k] = v;
+  // debounce 600ms เพื่อรวม call หลายๆ ตัวเป็นครั้งเดียว
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveAllSettings, 600);
+}
+
+function saveAllSettings(){
+  if(!navigator.onLine) return;
+  const payload = {
+    action: 'saveAllSettings',
+    settings: {
+      grid:    String(cfg.grid),
+      timer:   String(cfg.timer),
+      res:     String(cfg.res),
+      gpsThresh: String(cfg.gpsThresh),
+      qr:      String(cfg.qr),
+      project: String(cfg.project || ''),
+      projects: JSON.stringify(projects)
+    }
+  };
+  fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: {'Content-Type':'text/plain;charset=utf-8'}
+  }).then(r=>r.json()).then(res=>{
+    if(res.status==='success') toast('✓ บันทึกตั้งค่าแล้ว','ok');
+  }).catch(e=>console.error('saveAllSettings failed:',e));
 }
 
 function togSetting(k){
@@ -846,13 +871,8 @@ function renderProjSetList(){
 }
 
 function saveProjectsToCloud(){
-  if(navigator.onLine){
-    fetch(GAS_URL,{
-      method:'POST',
-      body: JSON.stringify({action:'saveSetting',key:'projects',value:JSON.stringify(projects)}),
-      headers:{'Content-Type':'text/plain;charset=utf-8'}
-    }).catch(e=>console.error(e));
-  }
+  // รวมไปกับ saveAllSettings เพื่อบันทึกลง Sheet ตั้งค่าเดียว
+  saveAllSettings();
 }
 
 /* ================================================================
