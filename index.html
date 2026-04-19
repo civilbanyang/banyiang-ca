@@ -7,302 +7,819 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SurveyCAM">
-<meta name="theme-color" content="#080c12">
+<meta name="theme-color" content="#060a10">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>SurveyCAM</title>
 <style>
+/* ═══════════════════════════════════════════
+   RESET & TOKENS
+═══════════════════════════════════════════ */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 :root{
-  --bg:#080c12;--s1:#0e1420;--s2:#141c2e;--s3:#1c2640;
-  --ac:#00e5b0;--ad:rgba(0,229,176,.15);--ag:rgba(0,229,176,.3);
-  --bl:#3b82f6;--bld:rgba(59,130,246,.15);
-  --wn:#f59e0b;--dn:#ef4444;
-  --tx:#eef2ff;--mu:#64748b;
-  --br:rgba(255,255,255,.07);--br2:rgba(255,255,255,.13);
+  /* backgrounds */
+  --bg:#060a10;
+  --s1:#0b1018;
+  --s2:#101620;
+  --s3:#161e2c;
+  --s4:#1c2738;
+  /* accents */
+  --ac:#00dba4;
+  --ac2:#00b88c;
+  --ad:rgba(0,219,164,.12);
+  --ag:rgba(0,219,164,.28);
+  --al:rgba(0,219,164,.06);
+  /* blue */
+  --bl:#4f9cf9;
+  --bld:rgba(79,156,249,.12);
+  /* amber / danger */
+  --wn:#f5a623;
+  --dn:#f04444;
+  --dnd:rgba(240,68,68,.12);
+  /* text */
+  --tx:#e8eef8;
+  --t2:#8899b0;
+  --t3:#4a5a70;
+  /* borders */
+  --br:rgba(255,255,255,.065);
+  --br2:rgba(255,255,255,.12);
+  --br3:rgba(255,255,255,.18);
+  /* font */
   --fn:'SF Mono','Fira Code','Courier New',monospace;
-  --r:12px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+  /* radius */
+  --r:14px;
+  --r2:10px;
+  /* safe areas */
+  --st:env(safe-area-inset-top,0px);
+  --sb:env(safe-area-inset-bottom,0px);
 }
-html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%;overflow:hidden;}
+html,body{
+  background:var(--bg);color:var(--tx);
+  font-family:var(--fn);height:100%;overflow:hidden;
+}
 #app{display:flex;flex-direction:column;height:100dvh;position:relative;overflow:hidden;}
-.page{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);
-  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:10;}
+
+/* ═══════════════════════════════════════════
+   PAGE SYSTEM
+═══════════════════════════════════════════ */
+.page{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  background:var(--bg);
+  transform:translateX(100%);
+  transition:transform .3s cubic-bezier(.25,.46,.45,.94);
+  z-index:10;
+}
 .page.active{transform:translateX(0);}
 #pg-cam{position:relative;transform:none;z-index:1;}
 
-/* VIEWFINDER */
-#vf{flex:1;position:relative;overflow:hidden;background:#000;}
-#video{width:100%;height:100%;object-fit:cover;display:block;}
-#vf::after{content:'';position:absolute;inset:0;pointer-events:none;
-  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.02) 2px,rgba(0,0,0,.02) 4px);z-index:2;}
+/* ═══════════════════════════════════════════
+   SPLASH
+═══════════════════════════════════════════ */
+#splash{
+  position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+}
+.splash-logo{
+  display:flex;align-items:center;gap:10px;
+}
+.splash-icon{
+  width:52px;height:52px;border-radius:16px;
+  background:linear-gradient(135deg,var(--ac),#00a87e);
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;
+  box-shadow:0 0 32px rgba(0,219,164,.35);
+}
+.splash-name{font-size:22px;font-weight:700;color:var(--tx);letter-spacing:.1em;}
+.splash-name span{color:var(--ac);}
+.sring{
+  width:36px;height:36px;border-radius:50%;
+  border:2px solid var(--s4);border-top-color:var(--ac);
+  animation:spin .8s linear infinite;
+}
+.stxt{font-size:10px;color:var(--t2);letter-spacing:.15em;}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
-/* GRID OVERLAY */
+/* ═══════════════════════════════════════════
+   CAMERA PAGE
+═══════════════════════════════════════════ */
+#vf{flex:1;position:relative;overflow:hidden;background:#000;min-height:0;}
+#video{width:100%;height:100%;object-fit:cover;display:block;}
+/* scanline texture */
+#vf::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.025) 3px,rgba(0,0,0,.025) 4px);
+  z-index:2;
+}
+/* grid overlay */
 #grid-overlay{position:absolute;inset:0;pointer-events:none;z-index:3;display:none;}
 #grid-overlay.show{display:block;}
 #grid-overlay svg{width:100%;height:100%;}
+/* gps meter bar */
+#meter{position:absolute;top:0;left:0;right:0;height:2px;z-index:6;background:rgba(0,0,0,.4);}
+#mfill{height:100%;width:0;transition:width .6s,background .6s;}
 
-#meter{position:absolute;top:0;left:0;right:0;height:3px;z-index:6;background:rgba(0,0,0,.3);}
-#mfill{height:100%;width:0;transition:width .5s,background .5s;}
+/* HUD */
+#hud{
+  position:absolute;top:0;left:0;right:0;z-index:5;
+  padding:calc(var(--st)+12px) 14px 0;
+  background:linear-gradient(rgba(6,10,16,.8) 0%,transparent 100%);
+  pointer-events:none;
+}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:6px;padding-bottom:10px;}
 
-#hud{position:absolute;top:0;left:0;right:0;z-index:5;
-  padding:calc(var(--st)+10px) 14px 0;
-  background:linear-gradient(rgba(8,12,18,.85),transparent);pointer-events:none;}
-.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;}
-.badge{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.2em;color:var(--ac);font-weight:700;}
-.badge .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:blink 2s infinite;}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-#hclock{font-size:13px;color:rgba(255,255,255,.9);letter-spacing:.08em;}
-#hgps{font-size:9px;letter-spacing:.1em;padding:3px 8px;border-radius:20px;
-  border:1px solid var(--ag);background:var(--ad);color:var(--ac);}
-#hgps.warn{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.15);color:var(--wn);}
-#hgps.err{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:var(--dn);}
+.hbadge{
+  display:flex;align-items:center;gap:5px;
+  font-size:9px;letter-spacing:.18em;color:var(--ac);font-weight:700;
+}
+.hbadge .dot{width:5px;height:5px;border-radius:50%;background:var(--ac);animation:blink 2s infinite;}
 
-/* FLIP CAM BUTTON */
-#bflip{position:absolute;top:calc(var(--st)+14px);right:14px;width:38px;height:38px;
-  border-radius:50%;background:rgba(8,12,18,.6);color:#fff;border:1px solid var(--br2);
-  z-index:10;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;}
-#bflip:active{background:var(--ad);border-color:var(--ac);}
+#hclock{font-size:12px;color:rgba(255,255,255,.85);letter-spacing:.07em;font-weight:600;}
 
-.ret{position:absolute;inset:10%;pointer-events:none;z-index:3;}
-.rc{position:absolute;width:22px;height:22px;}
-.rc::before,.rc::after{content:'';position:absolute;background:var(--ac);opacity:.8;}
-.rc.tl{top:0;left:0}.rc.tl::before{width:2px;height:100%;top:0;left:0}.rc.tl::after{height:2px;width:100%;top:0;left:0}
-.rc.tr{top:0;right:0}.rc.tr::before{width:2px;height:100%;top:0;right:0}.rc.tr::after{height:2px;width:100%;top:0;right:0}
-.rc.bl{bottom:0;left:0}.rc.bl::before{width:2px;height:100%;bottom:0;left:0}.rc.bl::after{height:2px;width:100%;bottom:0;left:0}
-.rc.br{bottom:0;right:0}.rc.br::before{width:2px;height:100%;bottom:0;right:0}.rc.br::after{height:2px;width:100%;bottom:0;right:0}
+#hgps{
+  font-size:8.5px;letter-spacing:.08em;
+  padding:3px 9px;border-radius:20px;
+  border:1px solid var(--ag);background:var(--ad);color:var(--ac);
+  white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;
+}
+#hgps.warn{border-color:rgba(245,166,35,.4);background:rgba(245,166,35,.12);color:var(--wn);}
+#hgps.err{border-color:rgba(240,68,68,.35);background:rgba(240,68,68,.1);color:var(--dn);}
 
-#zctrl{position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  display:flex;flex-direction:column;align-items:center;gap:8px;z-index:5;}
-.zbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--br2);
-  background:rgba(8,12,18,.75);color:var(--tx);font-size:20px;cursor:pointer;
+/* flip cam button */
+#bflip{
+  position:absolute;top:calc(var(--st)+10px);right:14px;
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(6,10,16,.65);color:#fff;
+  border:1px solid var(--br3);z-index:10;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   display:flex;align-items:center;justify-content:center;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:all .15s;}
+  font-size:17px;cursor:pointer;transition:all .15s;
+}
+#bflip:active{background:var(--ad);border-color:var(--ac);transform:scale(.92);}
+
+/* project badge on viewfinder */
+#proj-badge{
+  position:absolute;z-index:20;
+  top:calc(var(--st)+60px);left:50%;transform:translateX(-50%);
+  background:rgba(6,10,16,.7);
+  border:1px solid var(--ag);color:var(--ac);
+  font-size:9px;font-weight:700;font-family:var(--fn);
+  padding:5px 14px;border-radius:20px;cursor:pointer;
+  max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  pointer-events:all;
+  transition:background .2s,border-color .2s;
+}
+#proj-badge:active{background:var(--ad);}
+#proj-badge.no-proj{border-color:rgba(245,166,35,.4);color:var(--wn);}
+
+/* corner reticles */
+.ret{position:absolute;inset:12%;pointer-events:none;z-index:3;}
+.rc{position:absolute;width:20px;height:20px;}
+.rc::before,.rc::after{content:'';position:absolute;background:var(--ac);opacity:.7;}
+.rc.tl{top:0;left:0}.rc.tl::before{width:1.5px;height:100%;top:0;left:0}.rc.tl::after{height:1.5px;width:100%;top:0;left:0}
+.rc.tr{top:0;right:0}.rc.tr::before{width:1.5px;height:100%;top:0;right:0}.rc.tr::after{height:1.5px;width:100%;top:0;right:0}
+.rc.bl{bottom:0;left:0}.rc.bl::before{width:1.5px;height:100%;bottom:0;left:0}.rc.bl::after{height:1.5px;width:100%;bottom:0;left:0}
+.rc.br{bottom:0;right:0}.rc.br::before{width:1.5px;height:100%;bottom:0;right:0}.rc.br::after{height:1.5px;width:100%;bottom:0;right:0}
+
+/* zoom control */
+#zctrl{
+  position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:6px;z-index:5;
+}
+.zbtn{
+  width:36px;height:36px;border-radius:50%;
+  border:1px solid var(--br3);background:rgba(6,10,16,.7);
+  color:var(--tx);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:all .15s;
+}
 .zbtn:active{background:var(--ad);border-color:var(--ac);}
-#zlbl{font-size:10px;color:var(--ac);background:rgba(8,12,18,.75);
-  padding:3px 7px;border-radius:6px;border:1px solid var(--ad);}
+#zlbl{
+  font-size:9px;color:var(--ac);
+  background:rgba(6,10,16,.7);
+  padding:3px 7px;border-radius:6px;border:1px solid var(--ad);
+}
 
-/* TIMER COUNTDOWN */
-#timer-display{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  z-index:20;font-size:72px;font-weight:700;color:#fff;
-  text-shadow:0 0 30px var(--ac);display:none;pointer-events:none;}
+/* timer countdown */
+#timer-display{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:20;font-size:80px;font-weight:700;color:#fff;
+  text-shadow:0 0 40px var(--ac),0 0 80px rgba(0,219,164,.4);
+  display:none;pointer-events:none;
+}
 
-#gbot{position:absolute;bottom:0;left:0;right:0;z-index:5;
-  background:linear-gradient(transparent,rgba(8,12,18,.93));pointer-events:none;}
-#cstrip{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:10px 14px 6px;}
-.ci{display:flex;gap:7px;align-items:baseline;}
-.cl{color:var(--ac);font-size:9px;letter-spacing:.18em;min-width:28px;font-weight:700;}
-.cv{color:#fff;font-size:14px;letter-spacing:.03em;font-weight:600;}
-#dstrip{display:flex;justify-content:space-between;padding:2px 14px 12px;
-  font-size:13px;color:rgba(255,255,255,.88);letter-spacing:.06em;font-weight:600;}
+/* GPS data strip at bottom of viewfinder */
+#gbot{
+  position:absolute;bottom:0;left:0;right:0;z-index:5;
+  background:linear-gradient(transparent,rgba(6,10,16,.92) 60%);
+  pointer-events:none;
+}
+#cstrip{
+  display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
+  gap:0;padding:8px 14px 4px;
+}
+.ci{display:flex;flex-direction:column;gap:1px;}
+.cl{color:var(--ac);font-size:7.5px;letter-spacing:.2em;font-weight:700;}
+.cv{color:#fff;font-size:11px;letter-spacing:.02em;font-weight:600;}
+#dstrip{
+  display:flex;justify-content:space-between;
+  padding:2px 14px 10px;
+  font-size:11px;color:rgba(255,255,255,.8);letter-spacing:.05em;font-weight:600;
+}
 
-#glock{position:absolute;inset:0;z-index:20;background:rgba(8,12,18,.9);
-  display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+/* GPS lock overlay */
+#glock{
+  position:absolute;inset:0;z-index:20;
+  background:rgba(6,10,16,.92);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
 #glock.show{display:flex;}
-.lring{width:64px;height:64px;border-radius:50%;border:2px solid var(--br2);
-  border-top-color:var(--ac);animation:spin .9s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg)}}
-.ltxt{font-size:12px;color:var(--tx);letter-spacing:.1em;text-align:center;line-height:1.9;}
-.lacc{font-size:22px;color:var(--ac);font-weight:700;}
-.lskip{margin-top:6px;padding:9px 22px;border-radius:20px;border:1px solid var(--br2);
-  background:transparent;color:var(--mu);font-family:var(--fn);font-size:10px;cursor:pointer;}
+.lring{
+  width:60px;height:60px;border-radius:50%;
+  border:2px solid var(--s4);border-top-color:var(--ac);
+  animation:spin .9s linear infinite;
+}
+.ltxt{font-size:11px;color:var(--tx);letter-spacing:.1em;text-align:center;line-height:2;}
+.lacc{font-size:24px;color:var(--ac);font-weight:700;letter-spacing:-.01em;}
+.lskip{
+  margin-top:4px;padding:10px 24px;border-radius:24px;
+  border:1px solid var(--br3);background:rgba(255,255,255,.06);
+  color:var(--tx);font-family:var(--fn);font-size:10px;cursor:pointer;
+  transition:all .2s;letter-spacing:.08em;
+}
+.lskip:active{background:var(--ad);border-color:var(--ac);color:var(--ac);}
 
-#ctrl{background:var(--s1);border-top:1px solid var(--br);
-  padding:14px 20px calc(14px + var(--sb));
-  display:flex;align-items:center;justify-content:space-between;gap:12px;}
-#bgal{width:54px;height:54px;border-radius:var(--r);border:1px solid var(--br2);
-  background:var(--s2);cursor:pointer;overflow:hidden;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;}
-#bgal:active{border-color:var(--ac);}
+/* ═══════════════════════════════════════════
+   SHUTTER BAR
+═══════════════════════════════════════════ */
+#ctrl{
+  background:var(--s1);
+  border-top:1px solid var(--br);
+  padding:16px 20px calc(16px + var(--sb));
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  position:relative;
+}
+/* gallery thumb */
+#bgal{
+  width:58px;height:58px;border-radius:var(--r2);
+  border:1px solid var(--br2);background:var(--s2);
+  cursor:pointer;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;position:relative;
+  transition:border-color .2s,transform .15s;
+}
+#bgal:active{border-color:var(--ac);transform:scale(.94);}
 #gthumb{width:100%;height:100%;object-fit:cover;display:none;}
-#gicon{color:var(--mu);font-size:22px;}
-#gcnt{position:absolute;top:4px;right:4px;background:var(--ac);color:#000;
-  font-size:8px;font-weight:700;padding:1px 4px;border-radius:6px;display:none;}
-#bshut{width:74px;height:74px;border-radius:50%;border:3px solid var(--ac);
-  background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:all .15s;position:relative;}
-#bshut:active{transform:scale(.92);}
-#sinr{width:60px;height:60px;border-radius:50%;background:var(--ac);transition:all .15s;}
-#bshut.fl #sinr{background:#fff;transform:scale(.8);}
-#bshut.ng{border-color:var(--wn);}#bshut.ng #sinr{background:var(--wn);}
-#bset{width:54px;height:54px;border-radius:50%;border:1px solid var(--br2);
-  background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;
-  color:var(--tx);font-size:20px;flex-shrink:0;}
-#bset:active{border-color:var(--ac);}
+#gicon{color:var(--t2);font-size:20px;}
+#gcnt{
+  position:absolute;top:-5px;right:-5px;
+  background:var(--ac);color:#000;
+  font-size:8px;font-weight:700;
+  min-width:18px;height:18px;
+  padding:0 4px;border-radius:9px;
+  display:none;align-items:center;justify-content:center;
+  border:2px solid var(--s1);
+}
+/* shutter */
+#bshut{
+  width:76px;height:76px;border-radius:50%;
+  border:3px solid var(--ac);background:transparent;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .15s;position:relative;
+  box-shadow:0 0 0 0 rgba(0,219,164,.3);
+}
+#bshut:active{transform:scale(.91);}
+#bshut.fl{box-shadow:0 0 0 12px rgba(0,219,164,.15);}
+#sinr{width:62px;height:62px;border-radius:50%;background:var(--ac);transition:all .15s;}
+#bshut.fl #sinr{background:#fff;transform:scale(.82);}
+#bshut.ng{border-color:var(--wn);}
+#bshut.ng #sinr{background:var(--wn);}
+/* settings */
+#bset{
+  width:58px;height:58px;border-radius:50%;
+  border:1px solid var(--br2);background:var(--s2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--t2);font-size:19px;flex-shrink:0;
+  transition:all .15s;
+}
+#bset:active{border-color:var(--ac);color:var(--ac);transform:scale(.94);}
 
-#nav{background:var(--s1);border-top:1px solid var(--br);
-  display:flex;gap:4px;padding:8px 12px;overflow-x:auto;scrollbar-width:none;}
-#nav::-webkit-scrollbar{display:none;}
-.ntab{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid transparent;
-  background:transparent;color:var(--mu);font-family:var(--fn);font-size:10px;
-  letter-spacing:.08em;cursor:pointer;transition:all .2s;}
-.ntab.on,.ntab:active{background:var(--ad);border-color:var(--ag);color:var(--ac);}
+/* ═══════════════════════════════════════════
+   BOTTOM NAV
+═══════════════════════════════════════════ */
+#nav{
+  background:var(--s1);border-top:1px solid var(--br);
+  display:flex;gap:0;padding:0;
+}
+.ntab{
+  flex:1;padding:10px 4px 12px;
+  border:none;border-top:2px solid transparent;
+  background:transparent;color:var(--t2);
+  font-family:var(--fn);font-size:8.5px;
+  letter-spacing:.06em;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:all .2s;
+}
+.ntab .ni{font-size:17px;line-height:1;}
+.ntab .nl{font-size:8px;margin-top:1px;}
+.ntab.on{color:var(--ac);border-top-color:var(--ac);}
+.ntab:active{color:var(--ac);background:var(--al);}
+#ncount{
+  display:inline-block;background:var(--ac);color:#000;
+  font-size:7px;font-weight:700;
+  min-width:14px;height:14px;border-radius:7px;padding:0 3px;
+  line-height:14px;text-align:center;
+  vertical-align:middle;margin-left:2px;
+}
 
-/* PANEL COMMON */
-.ph{display:flex;align-items:center;justify-content:space-between;
-  padding:calc(var(--st)+14px) 16px 14px;border-bottom:1px solid var(--br);background:var(--s1);}
-.pt{font-size:13px;letter-spacing:.15em;color:var(--tx);display:flex;align-items:center;gap:8px;}
-.bk{padding:7px 14px;border-radius:20px;border:1px solid var(--br2);
-  background:transparent;color:var(--mu);font-family:var(--fn);font-size:10px;cursor:pointer;}
+/* ═══════════════════════════════════════════
+   PANEL HEADER (shared)
+═══════════════════════════════════════════ */
+.ph{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(var(--st)+14px) 16px 14px;
+  border-bottom:1px solid var(--br);
+  background:var(--s1);
+  flex-shrink:0;
+}
+.pt{
+  font-size:12px;letter-spacing:.14em;color:var(--tx);font-weight:700;
+  display:flex;align-items:center;gap:8px;
+}
+.bk{
+  padding:7px 14px;border-radius:20px;
+  border:1px solid var(--br2);background:transparent;
+  color:var(--t2);font-family:var(--fn);font-size:9px;
+  cursor:pointer;letter-spacing:.06em;transition:all .2s;
+}
 .bk:active{border-color:var(--ac);color:var(--ac);}
 
-/* SETTINGS PANEL */
-#pg-settings{overflow-y:auto;}
-.set-body{flex:1;overflow-y:auto;padding:16px;}
-.set-sec{margin-bottom:20px;}
-.set-title{font-size:9px;color:var(--ac);letter-spacing:.2em;margin-bottom:10px;font-weight:700;}
-.set-row{display:flex;align-items:center;justify-content:space-between;
-  padding:12px 14px;background:var(--s2);border-radius:10px;margin-bottom:6px;
-  border:1px solid var(--br);}
-.set-lbl{font-size:11px;color:var(--tx);}
-.set-sub{font-size:9px;color:var(--mu);margin-top:2px;}
+/* ═══════════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════════ */
+#pg-settings{overflow:hidden;}
+.set-body{flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch;}
+.set-sec{margin-bottom:18px;}
+.set-title{
+  font-size:8px;color:var(--ac);letter-spacing:.22em;
+  margin-bottom:8px;font-weight:700;
+  padding-left:2px;
+}
+.set-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 14px;background:var(--s2);border-radius:var(--r2);
+  margin-bottom:5px;border:1px solid var(--br);
+  transition:border-color .2s;
+}
+.set-row:active{border-color:var(--br2);}
+.set-lbl{font-size:11px;color:var(--tx);font-weight:600;}
+.set-sub{font-size:9px;color:var(--t2);margin-top:2px;}
 .set-ctrl{display:flex;align-items:center;gap:8px;}
-.tog{width:42px;height:24px;border-radius:12px;background:var(--s3);
-  border:1px solid var(--br2);cursor:pointer;position:relative;transition:background .2s;}
-.tog.on{background:var(--ac);}
-.tog::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;
-  background:#fff;top:2px;left:2px;transition:left .2s;}
+/* toggle */
+.tog{
+  width:44px;height:26px;border-radius:13px;
+  background:var(--s4);border:1px solid var(--br2);
+  cursor:pointer;position:relative;
+  transition:background .25s,border-color .25s;flex-shrink:0;
+}
+.tog.on{background:var(--ac);border-color:var(--ac2);}
+.tog::after{
+  content:'';position:absolute;
+  width:20px;height:20px;border-radius:50%;
+  background:#fff;top:2px;left:2px;
+  transition:left .25s;
+  box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
 .tog.on::after{left:20px;}
-.sel{background:var(--s3);border:1px solid var(--br2);color:var(--tx);
-  font-family:var(--fn);font-size:10px;padding:5px 8px;border-radius:8px;cursor:pointer;}
-.cache-info{font-size:10px;color:var(--mu);padding:8px 14px;}
+/* select */
+.sel{
+  background:var(--s3);border:1px solid var(--br2);color:var(--tx);
+  font-family:var(--fn);font-size:10px;padding:6px 8px;border-radius:8px;
+  cursor:pointer;outline:none;
+}
+.sel:focus{border-color:var(--ag);}
 
-/* PHOTOS */
-#pgrid{flex:1;overflow-y:auto;padding:10px;
-  display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;}
-.pc{background:var(--s2);border-radius:var(--r);border:1px solid var(--br);
-  overflow:hidden;cursor:pointer;transition:border-color .2s;position:relative;}
-.pc:active{border-color:var(--ac);}
+/* ═══════════════════════════════════════════
+   PHOTOS GRID
+═══════════════════════════════════════════ */
+#pg-photos{overflow:hidden;}
+.photos-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;
+  border-bottom:1px solid var(--br);
+  background:var(--s1);
+  flex-shrink:0;
+}
+.photos-toolbar-left{display:flex;align-items:center;gap:6px;}
+.ptcount{font-size:10px;color:var(--t2);}
+.sync-btn{
+  padding:6px 12px;border-radius:16px;
+  border:1px solid var(--ag);background:var(--ad);
+  color:var(--ac);font-family:var(--fn);font-size:9px;
+  cursor:pointer;transition:all .2s;
+}
+.sync-btn:active{background:rgba(0,219,164,.2);}
+#pgrid{
+  flex:1;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch;
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;
+}
+.pc{
+  background:var(--s2);border-radius:var(--r2);
+  border:1px solid var(--br);overflow:hidden;
+  cursor:pointer;transition:border-color .2s,transform .15s;
+  position:relative;
+  animation:fadeUp .3s both;
+}
+.pc:active{border-color:var(--ac);transform:scale(.97);}
 .pc img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;}
-.pm{padding:7px 9px;}
-.pdt{font-size:9px;color:var(--mu);line-height:1.4;}
-.pco{font-size:9px;color:var(--ac);margin-top:2px;}
-.emp{grid-column:1/-1;text-align:center;padding:60px 20px;
-  color:var(--mu);font-size:11px;line-height:2;}
-
-/* SYNC BADGE */
-.p-sync{position:absolute;top:6px;right:6px;background:rgba(8,12,18,.8);border-radius:50%;
+.pm{padding:8px 10px;}
+.pdt{font-size:8.5px;color:var(--t2);line-height:1.5;}
+.pco{font-size:9px;color:var(--ac);margin-top:3px;font-weight:600;}
+.ppj{
+  font-size:8px;color:var(--t2);
+  background:var(--s3);border-radius:6px;
+  padding:2px 6px;margin-top:4px;display:inline-block;
+}
+.emp{
+  grid-column:1/-1;text-align:center;
+  padding:60px 20px;color:var(--t2);
+  font-size:11px;line-height:2.2;
+}
+.emp-icon{font-size:36px;margin-bottom:8px;display:block;}
+/* sync badge */
+.p-sync{
+  position:absolute;top:7px;right:7px;
+  background:rgba(6,10,16,.8);border-radius:50%;
   width:22px;height:22px;display:flex;align-items:center;justify-content:center;
-  font-size:10px;border:1px solid rgba(255,255,255,.2);z-index:2;}
-.p-sync.ok{background:rgba(0,229,176,.2);border-color:#00e5b0;}
+  font-size:10px;border:1px solid rgba(255,255,255,.15);z-index:2;
+}
+.p-sync.ok{background:rgba(0,219,164,.2);border-color:var(--ac);}
 
-/* VIEWER */
-#vwrap{flex:1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-#vimg{max-width:100%;max-height:100%;object-fit:contain;}
-#vbot{background:var(--s1);border-top:1px solid var(--br);padding:14px 16px calc(14px + var(--sb));}
-.itbl{width:100%;font-size:11px;border-collapse:collapse;}
-.itbl td{padding:4px 0;}
-.itbl .lb{color:var(--ac);font-size:8px;letter-spacing:.15em;width:40px;}
-.itbl .vl{color:var(--tx);}
-.arow{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;}
-.ab{flex:1;min-width:60px;padding:10px 6px;border-radius:10px;border:1px solid var(--br2);
-  background:var(--s2);color:var(--tx);font-family:var(--fn);font-size:10px;
-  cursor:pointer;text-align:center;transition:all .15s;}
+/* ═══════════════════════════════════════════
+   VIEWER
+═══════════════════════════════════════════ */
+#vwrap{
+  flex:1;background:#000;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;min-height:0;position:relative;
+}
+#vimg{max-width:100%;max-height:100%;object-fit:contain;display:block;}
+/* swipe hint arrows */
+.v-nav-btn{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(6,10,16,.55);border:1px solid var(--br2);
+  color:var(--tx);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:all .2s;
+}
+.v-nav-btn:disabled{opacity:.25;pointer-events:none;}
+.v-nav-btn:active{background:var(--ad);border-color:var(--ac);}
+#v-prev{left:10px;}#v-next{right:10px;}
+/* viewer info panel */
+#vbot{
+  background:var(--s1);border-top:1px solid var(--br);
+  padding:12px 16px calc(12px + var(--sb));
+  flex-shrink:0;
+}
+/* two-column data grid */
+.info-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;
+}
+.info-cell{
+  background:var(--s2);border-radius:8px;padding:7px 10px;
+  border:1px solid var(--br);
+}
+.info-cell .ic-lbl{font-size:7.5px;color:var(--ac);letter-spacing:.2em;font-weight:700;}
+.info-cell .ic-val{font-size:10px;color:var(--tx);margin-top:2px;word-break:break-all;}
+.info-proj{
+  display:flex;align-items:center;gap:6px;
+  background:var(--s2);border-radius:8px;padding:7px 10px;
+  border:1px solid var(--br);margin-bottom:10px;
+}
+.info-proj .ic-lbl{font-size:7.5px;color:var(--ac);letter-spacing:.2em;font-weight:700;min-width:38px;}
+.info-proj .ic-val{font-size:10px;color:var(--tx);}
+/* action buttons — 2 rows */
+.arow{display:flex;gap:5px;flex-wrap:wrap;}
+.ab{
+  flex:1;min-width:72px;padding:9px 6px;border-radius:9px;
+  border:1px solid var(--br2);background:var(--s2);
+  color:var(--tx);font-family:var(--fn);font-size:9px;
+  cursor:pointer;text-align:center;transition:all .15s;
+  white-space:nowrap;
+}
 .ab:active{opacity:.7;}
 .ab.pr{background:var(--ad);border-color:var(--ag);color:var(--ac);}
-.ab.gm{background:var(--bld);border-color:rgba(59,130,246,.35);color:#60a5fa;}
-.ab.rd{border-color:rgba(239,68,68,.3);color:var(--dn);}
-.ab:disabled{opacity:0.5;cursor:not-allowed;border-color:var(--br2);color:var(--mu);background:var(--s2);}
+.ab.gm{background:var(--bld);border-color:rgba(79,156,249,.3);color:var(--bl);}
+.ab.rd{border-color:rgba(240,68,68,.3);background:var(--dnd);color:var(--dn);}
+.ab:disabled{opacity:.4;cursor:not-allowed;}
 
-/* QR MODAL */
-#qr-modal{position:fixed;inset:0;z-index:800;background:rgba(8,12,18,.95);
-  display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
-#qr-modal.show{display:flex;}
-#qr-canvas{border-radius:12px;}
-.qr-info{font-size:11px;color:var(--mu);text-align:center;letter-spacing:.05em;line-height:1.8;}
-.qr-close{padding:10px 28px;border-radius:20px;border:1px solid var(--br2);
-  background:transparent;color:var(--mu);font-family:var(--fn);font-size:10px;cursor:pointer;}
-
-/* PDF PROGRESS */
-#pdf-modal{position:fixed;inset:0;z-index:800;background:rgba(8,12,18,.95);
-  display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
-#pdf-modal.show{display:flex;}
-.pdf-title{font-size:14px;color:var(--ac);letter-spacing:.1em;}
-.pdf-sub{font-size:11px;color:var(--mu);letter-spacing:.06em;}
-#pdf-prog-bar{width:240px;height:4px;background:var(--s3);border-radius:2px;overflow:hidden;}
-#pdf-prog-fill{height:100%;background:var(--ac);width:0%;transition:width .3s;}
-
-/* MAP */
+/* ═══════════════════════════════════════════
+   MAP
+═══════════════════════════════════════════ */
 #mcon{flex:1;position:relative;overflow:hidden;}
 #lmap{width:100%;height:100%;}
-.mleg{position:absolute;bottom:12px;left:12px;z-index:1000;
-  background:rgba(8,12,18,.9);border:1px solid var(--br2);border-radius:10px;
-  padding:8px 12px;font-size:9px;color:var(--mu);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+.mleg{
+  position:absolute;bottom:16px;left:12px;z-index:1000;
+  background:rgba(6,10,16,.88);border:1px solid var(--br2);
+  border-radius:10px;padding:8px 12px;
+  font-size:9px;color:var(--t2);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
 .mleg b{color:var(--ac);}
-#mcache-btn{position:absolute;top:12px;right:12px;z-index:1000;
-  padding:8px 14px;border-radius:20px;border:1px solid var(--br2);
-  background:rgba(8,12,18,.85);color:var(--tx);font-family:var(--fn);font-size:10px;
-  cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+#offline-status{font-size:8.5px;}
+#mcache-btn{
+  position:absolute;top:12px;right:12px;z-index:1000;
+  padding:8px 14px;border-radius:20px;
+  border:1px solid var(--br2);background:rgba(6,10,16,.85);
+  color:var(--tx);font-family:var(--fn);font-size:9px;
+  cursor:pointer;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:all .2s;
+}
 #mcache-btn:active{border-color:var(--ac);color:var(--ac);}
+/* map filter bar */
+#map-filter-bar{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  z-index:1000;display:flex;gap:5px;flex-wrap:wrap;
+  justify-content:center;max-width:calc(100% - 90px);padding:0 4px;
+}
+.mf-chip{
+  background:rgba(11,16,24,.9);border:1px solid rgba(255,255,255,.1);
+  color:var(--t2);font-family:var(--fn);font-size:9px;font-weight:600;
+  padding:5px 11px;border-radius:16px;cursor:pointer;
+  backdrop-filter:blur(8px);white-space:nowrap;
+  transition:all .15s;
+}
+.mf-chip.active{background:rgba(0,219,164,.15);border-color:rgba(0,219,164,.45);color:var(--ac);}
 
-/* CUSTOM POPUP SCROLL */
-.map-popup-scroll::-webkit-scrollbar { width: 4px; }
-.map-popup-scroll::-webkit-scrollbar-thumb { background: var(--ac); border-radius: 4px; }
+/* ═══════════════════════════════════════════
+   PROJECT MODAL
+═══════════════════════════════════════════ */
+#proj-modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;
+  display:none;align-items:flex-end;justify-content:center;
+  padding:0;
+}
+#proj-modal.show{display:flex;}
+#proj-box{
+  background:var(--s1);
+  border:1px solid var(--br2);
+  border-radius:24px 24px 0 0;
+  width:100%;max-width:480px;
+  overflow:hidden;
+  box-shadow:0 -24px 60px rgba(0,0,0,.7);
+  max-height:82vh;display:flex;flex-direction:column;
+  animation:slideUp .3s cubic-bezier(.25,.46,.45,.94);
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+/* drag handle */
+#proj-box::before{
+  content:'';display:block;width:36px;height:4px;border-radius:2px;
+  background:var(--br3);margin:10px auto 0;flex-shrink:0;
+}
+#proj-header{
+  padding:14px 20px 16px;border-bottom:1px solid var(--br);flex-shrink:0;
+}
+#proj-title{font-size:15px;font-weight:700;color:var(--tx);letter-spacing:.05em;margin-bottom:3px;}
+#proj-sub{font-size:10px;color:var(--t2);}
+#proj-list{overflow-y:auto;padding:10px 14px;flex:1;-webkit-overflow-scrolling:touch;}
+.proj-item{
+  display:flex;align-items:center;gap:10px;padding:11px 12px;
+  border-radius:var(--r2);margin-bottom:5px;cursor:pointer;
+  border:1px solid var(--br);transition:all .15s;background:var(--s2);
+}
+.proj-item:active,.proj-item.sel{
+  background:var(--ad);border-color:var(--ag);
+}
+.proj-item-ico{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--s3);border:1px solid var(--br2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0;
+}
+.proj-item.sel .proj-item-ico{background:var(--ad);border-color:var(--ag);}
+.proj-item-info{flex:1;min-width:0;}
+.proj-item-name{
+  font-size:12px;font-weight:600;color:var(--tx);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.proj-item-count{font-size:9px;color:var(--t2);margin-top:2px;}
+.proj-item-del{
+  width:28px;height:28px;border-radius:8px;border:none;
+  background:transparent;color:var(--dn);font-size:14px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  opacity:.6;transition:opacity .2s;
+}
+.proj-item-del:active{opacity:1;}
+#proj-add-row{
+  display:flex;gap:8px;padding:10px 14px;
+  border-top:1px solid var(--br);flex-shrink:0;
+}
+#proj-new-inp{
+  flex:1;background:var(--s3);border:1px solid var(--br2);
+  color:var(--tx);font-family:var(--fn);font-size:12px;
+  padding:10px 12px;border-radius:10px;outline:none;
+}
+#proj-new-inp:focus{border-color:var(--ag);}
+#proj-new-inp::placeholder{color:var(--t3);}
+#proj-add-btn{
+  background:var(--ad);border:1px solid var(--ag);
+  color:var(--ac);font-family:var(--fn);font-size:11px;font-weight:700;
+  padding:10px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;
+}
+#proj-add-btn:active{background:rgba(0,219,164,.2);}
+#proj-actions{padding:10px 14px 14px;border-top:1px solid var(--br);flex-shrink:0;}
+#proj-skip{
+  width:100%;padding:10px;background:transparent;
+  border:1px solid var(--br);color:var(--t2);
+  font-family:var(--fn);font-size:11px;border-radius:10px;cursor:pointer;
+  transition:all .2s;
+}
+#proj-skip:active{border-color:var(--br2);color:var(--tx);}
 
+/* ═══════════════════════════════════════════
+   QR MODAL
+═══════════════════════════════════════════ */
+#qr-modal{
+  position:fixed;inset:0;z-index:800;background:rgba(6,10,16,.96);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+}
+#qr-modal.show{display:flex;}
+#qr-canvas{border-radius:12px;box-shadow:0 0 0 12px #fff;}
+.qr-info{font-size:10px;color:var(--t2);text-align:center;letter-spacing:.05em;line-height:1.9;}
+.qr-close{
+  padding:11px 30px;border-radius:24px;
+  border:1px solid var(--br2);background:transparent;
+  color:var(--t2);font-family:var(--fn);font-size:10px;cursor:pointer;
+  transition:all .2s;
+}
+.qr-close:active{border-color:var(--ac);color:var(--ac);}
+
+/* ═══════════════════════════════════════════
+   PDF MODAL
+═══════════════════════════════════════════ */
+#pdf-modal{
+  position:fixed;inset:0;z-index:800;background:rgba(6,10,16,.96);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+}
+#pdf-modal.show{display:flex;}
+.pdf-title{font-size:13px;color:var(--ac);letter-spacing:.12em;font-weight:700;}
+.pdf-sub{font-size:10px;color:var(--t2);letter-spacing:.06em;}
+#pdf-prog-bar{width:220px;height:3px;background:var(--s4);border-radius:2px;overflow:hidden;}
+#pdf-prog-fill{height:100%;background:var(--ac);width:0%;transition:width .3s;}
+
+/* ═══════════════════════════════════════════
+   MAP LEAFLET OVERRIDES
+═══════════════════════════════════════════ */
+.leaflet-popup-content-wrapper{
+  background:#0e1520!important;border:1px solid rgba(0,219,164,.25)!important;
+  border-radius:14px!important;box-shadow:0 8px 40px rgba(0,0,0,.7)!important;
+  padding:0!important;
+}
+.leaflet-popup-content{margin:0!important;width:220px!important;}
+.leaflet-popup-tip{background:#0e1520!important;}
+.leaflet-popup-close-button{color:#4a5a70!important;top:8px!important;right:8px!important;font-size:16px!important;}
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(0,219,164,.2)!important;}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{
+  background:rgba(0,219,164,.8)!important;color:#000!important;font-weight:700!important;font-family:monospace!important;}
+.survey-marker{
+  background:#00dba4;color:#000;font-size:9px;font-weight:700;font-family:monospace;
+  width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,.5);
+}
+.survey-marker span{transform:rotate(45deg);}
+.pop-wrap{padding:11px;}
+.pop-img{width:100%;height:128px;object-fit:cover;border-radius:10px 10px 0 0;display:block;}
+.pop-badge{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
+.pop-num{background:rgba(0,219,164,.12);color:#00dba4;font-size:9px;font-weight:700;padding:3px 8px;border-radius:16px;border:1px solid rgba(0,219,164,.25);}
+.pop-sync{font-size:12px;}
+.pop-row{font-size:9.5px;color:#8899b0;margin-bottom:3px;display:flex;gap:5px;}
+.pop-row b{color:#e8eef8;font-weight:600;}
+.pop-divider{border:none;border-top:1px solid rgba(255,255,255,.06);margin:7px 0;}
+.pop-btn{display:block;width:100%;padding:7px;border-radius:8px;border:1px solid rgba(79,156,249,.25);background:rgba(79,156,249,.08);color:#4f9cf9;font-family:monospace;font-size:9px;text-align:center;text-decoration:none;cursor:pointer;}
+.pop-nav{display:flex;gap:5px;margin-top:6px;}
+.pop-nav-btn{flex:1;padding:7px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#8899b0;font-family:monospace;font-size:9px;cursor:pointer;text-align:center;}
+.pop-nav-btn:active{background:rgba(0,219,164,.12);color:#00dba4;border-color:rgba(0,219,164,.3);}
+.pop-multi-header{background:rgba(245,166,35,.08);border-bottom:1px solid rgba(245,166,35,.18);padding:7px 11px;border-radius:14px 14px 0 0;color:#f5a623;font-size:9px;font-weight:700;text-align:center;}
+.map-popup-scroll::-webkit-scrollbar{width:3px;}
+.map-popup-scroll::-webkit-scrollbar-thumb{background:var(--ac);border-radius:3px;}
+
+/* ═══════════════════════════════════════════
+   SETTINGS: PROJECT LIST
+═══════════════════════════════════════════ */
+.proj-set-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 12px;border-radius:10px;margin-bottom:4px;
+  background:var(--s2);border:1px solid var(--br);
+}
+.proj-set-name{font-size:11px;color:var(--tx);flex:1;font-weight:600;}
+.proj-set-count{font-size:9px;color:var(--t2);margin-right:8px;}
+.proj-set-del{background:transparent;border:none;color:var(--dn);font-size:14px;cursor:pointer;padding:2px 6px;opacity:.7;}
+.proj-set-del:active{opacity:1;}
+
+/* ═══════════════════════════════════════════
+   MISC
+═══════════════════════════════════════════ */
 #cvs{display:none;}
-#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999;transition:opacity .06s;}
-#flash.on{opacity:.85;}
-#toast{position:fixed;bottom:130px;left:50%;transform:translateX(-50%);
-  background:rgba(8,12,18,.93);color:var(--tx);padding:9px 20px;border-radius:24px;
-  font-size:11px;letter-spacing:.05em;border:1px solid var(--br2);opacity:0;transition:opacity .3s;
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999;transition:opacity .05s;}
+#flash.on{opacity:.9;}
+#toast{
+  position:fixed;bottom:120px;left:50%;transform:translateX(-50%);
+  background:rgba(11,16,24,.95);color:var(--tx);
+  padding:10px 20px;border-radius:24px;
+  font-size:10.5px;letter-spacing:.05em;
+  border:1px solid var(--br2);opacity:0;transition:opacity .3s;
   z-index:1001;white-space:nowrap;pointer-events:none;
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  max-width:80vw;overflow:hidden;text-overflow:ellipsis;
+}
 #toast.show{opacity:1;}
 #toast.ok{border-color:var(--ag);color:var(--ac);}
-#toast.bad{border-color:rgba(239,68,68,.4);color:var(--dn);}
-#splash{position:fixed;inset:0;background:var(--bg);z-index:9999;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
-.sring{width:48px;height:48px;border-radius:50%;border:2px solid var(--br2);
-  border-top-color:var(--ac);animation:spin .8s linear infinite;}
-.stxt{font-size:11px;color:var(--mu);letter-spacing:.1em;}
+#toast.bad{border-color:rgba(240,68,68,.4);color:var(--dn);}
+
 </style>
 </head>
 <body>
-<div id="splash"><div class="sring"></div><div class="stxt">กำลังเชื่อมต่อฐานข้อมูล...</div></div>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-logo">
+    <div class="splash-icon">📍</div>
+    <div class="splash-name">Survey<span>CAM</span></div>
+  </div>
+  <div class="sring"></div>
+  <div class="stxt">กำลังเชื่อมต่อฐานข้อมูล...</div>
+</div>
 
 <div id="app">
 
-  <!-- CAMERA -->
+  <!-- ══════════════════════════════════════
+       CAMERA PAGE
+  ══════════════════════════════════════ -->
   <div id="pg-cam" style="display:flex;flex-direction:column;height:100dvh;">
     <div id="vf">
       <video id="video" autoplay muted playsinline></video>
       <canvas id="cvs"></canvas>
+
+      <!-- grid overlay -->
       <div id="grid-overlay">
         <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-          <line x1="33" y1="0" x2="33" y2="100" stroke="rgba(255,255,255,0.25)" stroke-width="0.3"/>
-          <line x1="66" y1="0" x2="66" y2="100" stroke="rgba(255,255,255,0.25)" stroke-width="0.3"/>
-          <line x1="0" y1="33" x2="100" y2="33" stroke="rgba(255,255,255,0.25)" stroke-width="0.3"/>
-          <line x1="0" y1="66" x2="100" y2="66" stroke="rgba(255,255,255,0.25)" stroke-width="0.3"/>
+          <line x1="33.3" y1="0" x2="33.3" y2="100" stroke="rgba(255,255,255,0.2)" stroke-width="0.25"/>
+          <line x1="66.6" y1="0" x2="66.6" y2="100" stroke="rgba(255,255,255,0.2)" stroke-width="0.25"/>
+          <line x1="0" y1="33.3" x2="100" y2="33.3" stroke="rgba(255,255,255,0.2)" stroke-width="0.25"/>
+          <line x1="0" y1="66.6" x2="100" y2="66.6" stroke="rgba(255,255,255,0.2)" stroke-width="0.25"/>
         </svg>
       </div>
+
       <div id="meter"><div id="mfill"></div></div>
+
+      <!-- HUD top bar -->
       <div id="hud">
         <div class="hrow">
-          <div class="badge"><span class="dot"></span>SURVEYCAM (CLOUD)</div>
+          <div class="hbadge"><span class="dot"></span>SURVEYCAM</div>
           <div id="hgps" class="warn">GPS...</div>
           <div id="hclock">--:--:--</div>
         </div>
       </div>
-      <!-- ปุ่มสลับกล้อง -->
+
+      <!-- flip cam -->
       <button id="bflip" onclick="flipCam()">🔄</button>
-      
+
+      <!-- current project badge -->
+      <div id="proj-badge" class="no-proj" onclick="openProjModal(false)">📋 เลือกโครงการ...</div>
+
+      <!-- corner reticles -->
       <div class="ret">
         <div class="rc tl"></div><div class="rc tr"></div>
         <div class="rc bl"></div><div class="rc br"></div>
       </div>
+
+      <!-- zoom control -->
       <div id="zctrl">
         <button class="zbtn" onclick="zIn()">+</button>
         <div id="zlbl">1×</div>
         <button class="zbtn" onclick="zOut()">−</button>
       </div>
-      <div id="timer-display" id="timerDisp">3</div>
+
+      <!-- timer countdown -->
+      <div id="timer-display">3</div>
+
+      <!-- GPS lock overlay -->
       <div id="glock">
         <div class="lring"></div>
         <div class="ltxt">กำลังล็อก GPS<br>รอสัญญาณแม่นยำ</div>
         <div class="lacc" id="lacv">-- m</div>
-        <button class="lskip" onclick="skipLock()">ถ่ายทันที</button>
+        <button class="lskip" onclick="skipLock()">ข้าม — ถ่ายทันที</button>
       </div>
+
+      <!-- GPS data strip -->
       <div id="gbot">
         <div id="cstrip">
           <div class="ci"><span class="cl">LAT</span><span class="cv" id="olat">--</span></div>
@@ -310,37 +827,65 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
           <div class="ci"><span class="cl">ALT</span><span class="cv" id="oalt">--</span></div>
           <div class="ci"><span class="cl">ACC</span><span class="cv" id="oacc">--</span></div>
         </div>
-        <div id="dstrip"><span id="odate">--/--/----</span><span id="otime">--:--:--</span></div>
+        <div id="dstrip">
+          <span id="odate">--/--/----</span>
+          <span id="otime">--:--:--</span>
+        </div>
       </div>
-    </div>
+    </div><!-- /vf -->
+
+    <!-- shutter bar -->
     <div id="ctrl">
-      <button id="bgal" onclick="goPg('photos')">
-        <img id="gthumb" alt=""><span id="gicon">⊞</span><span id="gcnt"></span>
+      <button id="bgal" onclick="goPg('photos')" title="รูปภาพ">
+        <img id="gthumb" alt="">
+        <span id="gicon">🖼</span>
+        <span id="gcnt"></span>
       </button>
       <button id="bshut" onclick="pressShutter()"><div id="sinr"></div></button>
-      <button id="bset" onclick="goPg('settings')">⚙</button>
+      <button id="bset" onclick="goPg('settings')" title="ตั้งค่า">⚙</button>
     </div>
-    <div id="nav">
-      <button class="ntab on">📷 กล้อง</button>
-      <button class="ntab" onclick="goPg('photos')">🗂 รูป <span id="ncount">0</span></button>
-      <button class="ntab" onclick="goPg('map')">🗺 แผนที่</button>
-      <button class="ntab" onclick="genPDF()">📊 PDF</button>
-      <button class="ntab" onclick="doCSV()">📋 CSV</button>
-    </div>
-  </div>
 
-  <!-- SETTINGS -->
+    <!-- bottom nav -->
+    <div id="nav">
+      <button class="ntab on" onclick="switchTab(this,'cam')">
+        <span class="ni">📷</span><span class="nl">กล้อง</span>
+      </button>
+      <button class="ntab" onclick="goPg('photos');switchTab(this,'photos')">
+        <span class="ni">🗂</span><span class="nl">รูป&nbsp;<span id="ncount">0</span></span>
+      </button>
+      <button class="ntab" onclick="goPg('map');switchTab(this,'map')">
+        <span class="ni">🗺</span><span class="nl">แผนที่</span>
+      </button>
+      <button class="ntab" onclick="goPg('export');switchTab(this,'export')">
+        <span class="ni">📤</span><span class="nl">ส่งออก</span>
+      </button>
+    </div>
+  </div><!-- /pg-cam -->
+
+  <!-- ══════════════════════════════════════
+       SETTINGS PAGE
+  ══════════════════════════════════════ -->
   <div id="pg-settings" class="page">
-    <div class="ph"><span class="pt">⚙ ตั้งค่า (บันทึกลง Cloud)</span><button class="bk" onclick="goBack()">← กลับ</button></div>
+    <div class="ph">
+      <span class="pt">⚙ ตั้งค่า</span>
+      <button class="bk" onclick="goBack()">← กลับ</button>
+    </div>
     <div class="set-body">
+
       <div class="set-sec">
         <div class="set-title">กล้อง</div>
         <div class="set-row">
-          <div><div class="set-lbl">Grid ช่วยจัดองค์ประกอบ</div><div class="set-sub">เส้นแบ่ง 3×3</div></div>
+          <div>
+            <div class="set-lbl">Grid 3×3</div>
+            <div class="set-sub">ช่วยจัดองค์ประกอบภาพ</div>
+          </div>
           <div class="tog" id="tog-grid" onclick="togSetting('grid')"></div>
         </div>
         <div class="set-row">
-          <div><div class="set-lbl">Self-timer</div><div class="set-sub">นับถอยหลังก่อนถ่าย</div></div>
+          <div>
+            <div class="set-lbl">Self-timer</div>
+            <div class="set-sub">นับถอยหลังก่อนถ่าย</div>
+          </div>
           <div class="set-ctrl">
             <select class="sel" id="sel-timer" onchange="saveSetting('timer',this.value)">
               <option value="0">ปิด</option>
@@ -351,17 +896,23 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
           </div>
         </div>
         <div class="set-row">
-          <div><div class="set-lbl">ความละเอียดภาพ</div><div class="set-sub">สูงกว่า = ไฟล์ใหญ่กว่า</div></div>
+          <div>
+            <div class="set-lbl">ความละเอียด</div>
+            <div class="set-sub">สูงกว่า = ไฟล์ใหญ่กว่า</div>
+          </div>
           <div class="set-ctrl">
             <select class="sel" id="sel-res" onchange="saveSetting('res',this.value);restartCam()">
-              <option value="4k">4K (สูงสุด)</option>
+              <option value="4k">4K</option>
               <option value="fhd">FHD 1080p</option>
               <option value="hd">HD 720p</option>
             </select>
           </div>
         </div>
         <div class="set-row">
-          <div><div class="set-lbl">GPS threshold แม่นยำ</div><div class="set-sub">รอจนถึงค่านี้ก่อนถ่าย</div></div>
+          <div>
+            <div class="set-lbl">GPS Threshold</div>
+            <div class="set-sub">รอความแม่นยำก่อนถ่าย</div>
+          </div>
           <div class="set-ctrl">
             <select class="sel" id="sel-gps" onchange="saveSetting('gpsThresh',this.value)">
               <option value="5">±5m (แม่นมาก)</option>
@@ -375,112 +926,226 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
       </div>
 
       <div class="set-sec">
-        <div class="set-title">stamp บนรูป</div>
+        <div class="set-title">Stamp บนรูป</div>
         <div class="set-row">
-          <div><div class="set-lbl">แสดง QR Code บนรูป</div><div class="set-sub">สแกนแล้วเปิด Google Maps</div></div>
-          <div class="tog" id="tog-qr" onclick="togSetting('qr')"></div>
-        </div>
-        <div class="set-row">
-          <div><div class="set-lbl">โครงการปัจจุบัน</div><div class="set-sub">แสดงบน stamp</div></div>
-          <div class="set-ctrl">
-            <button onclick="openProjModal(false)"
-              style="background:rgba(0,229,176,.12);border:1px solid rgba(0,229,176,.3);
-              color:#00e5b0;font-family:var(--fn);font-size:10px;padding:6px 12px;
-              border-radius:8px;cursor:pointer;">
-              <span id="inp-project-label">เลือก...</span>
-            </button>
-            <input type="hidden" id="inp-project">
+          <div>
+            <div class="set-lbl">QR Code บนรูป</div>
+            <div class="set-sub">สแกนแล้วเปิด Google Maps</div>
           </div>
+          <div class="tog" id="tog-qr" onclick="togSetting('qr')"></div>
         </div>
       </div>
 
       <div class="set-sec">
         <div class="set-title">โครงการ</div>
+        <div class="set-row" style="cursor:pointer;" onclick="openProjModal(false)">
+          <div>
+            <div class="set-lbl">โครงการปัจจุบัน</div>
+            <div class="set-sub">แสดงบน stamp ทุกรูป</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span id="inp-project-label" style="font-size:10px;color:var(--ac);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">เลือก...</span>
+            <span style="color:var(--t2);font-size:12px;">›</span>
+          </div>
+          <input type="hidden" id="inp-project">
+        </div>
         <div id="proj-set-list"></div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
+        <div style="display:flex;gap:7px;margin-top:8px;">
           <input id="proj-set-inp" type="text" placeholder="เพิ่มโครงการใหม่..."
             style="flex:1;background:var(--s3);border:1px solid var(--br2);color:var(--tx);
-            font-family:var(--fn);font-size:11px;padding:8px 10px;border-radius:10px;outline:none;">
+            font-family:var(--fn);font-size:11px;padding:9px 12px;border-radius:10px;outline:none;">
           <button onclick="addProjectFromSettings()"
-            style="background:rgba(0,229,176,.15);border:1px solid rgba(0,229,176,.35);
-            color:#00e5b0;font-family:var(--fn);font-size:11px;font-weight:700;
-            padding:8px 14px;border-radius:10px;cursor:pointer;">+ เพิ่ม</button>
+            style="background:var(--ad);border:1px solid var(--ag);color:var(--ac);
+            font-family:var(--fn);font-size:11px;font-weight:700;
+            padding:9px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;">+ เพิ่ม</button>
         </div>
       </div>
 
       <div class="set-sec">
-        <div class="set-title">ข้อมูลบน Cloud</div>
+        <div class="set-title">ข้อมูล Cloud</div>
         <div class="set-row">
-          <div><div class="set-lbl">ลบรูประบบทั้งหมด</div><div class="set-sub" id="photo-count-info">-- รูป</div></div>
-          <button onclick="clearAll()" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);
-            background:transparent;color:var(--dn);font-family:var(--fn);font-size:10px;cursor:pointer;">ลบทั้งหมด</button>
+          <div>
+            <div class="set-lbl">ลบรูปทั้งหมด</div>
+            <div class="set-sub" id="photo-count-info">-- รูป ใน Cloud</div>
+          </div>
+          <button onclick="clearAll()"
+            style="padding:7px 14px;border-radius:8px;border:1px solid rgba(240,68,68,.3);
+            background:var(--dnd);color:var(--dn);font-family:var(--fn);font-size:9px;cursor:pointer;">
+            ลบทั้งหมด
+          </button>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- PHOTOS -->
+    </div><!-- /set-body -->
+  </div><!-- /pg-settings -->
+
+  <!-- ══════════════════════════════════════
+       PHOTOS PAGE
+  ══════════════════════════════════════ -->
   <div id="pg-photos" class="page">
     <div class="ph">
-      <span class="pt">รูปภาพบน Cloud <button class="bk" style="margin-left:8px;" onclick="syncAllUnuploaded()">☁️ ส่งรูปที่ค้าง</button></span>
+      <span class="pt">🗂 รูปภาพ</span>
       <button class="bk" onclick="goBack()">← กลับ</button>
+    </div>
+    <div class="photos-toolbar">
+      <div class="photos-toolbar-left">
+        <span class="ptcount" id="photos-count-lbl">0 รูป</span>
+      </div>
+      <button class="sync-btn" onclick="syncAllUnuploaded()">☁️ ส่งรูปที่ค้าง</button>
     </div>
     <div id="pgrid"></div>
   </div>
 
-  <!-- VIEWER -->
+  <!-- ══════════════════════════════════════
+       EXPORT PAGE (replaces nav PDF/CSV)
+  ══════════════════════════════════════ -->
+  <div id="pg-export" class="page">
+    <div class="ph">
+      <span class="pt">📤 ส่งออกข้อมูล</span>
+      <button class="bk" onclick="goBack()">← กลับ</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;">
+
+      <div class="set-sec">
+        <div class="set-title">สรุปข้อมูล</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
+          <div style="background:var(--s2);border:1px solid var(--br);border-radius:var(--r2);padding:14px;text-align:center;">
+            <div style="font-size:26px;font-weight:700;color:var(--ac);" id="exp-total">0</div>
+            <div style="font-size:9px;color:var(--t2);margin-top:3px;letter-spacing:.1em;">จุดสำรวจ</div>
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--br);border-radius:var(--r2);padding:14px;text-align:center;">
+            <div style="font-size:26px;font-weight:700;color:var(--bl);" id="exp-gps">0</div>
+            <div style="font-size:9px;color:var(--t2);margin-top:3px;letter-spacing:.1em;">มีพิกัด GPS</div>
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--br);border-radius:var(--r2);padding:14px;text-align:center;">
+            <div style="font-size:26px;font-weight:700;color:var(--wn);" id="exp-unup">0</div>
+            <div style="font-size:9px;color:var(--t2);margin-top:3px;letter-spacing:.1em;">ยังไม่ได้ซิงค์</div>
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--br);border-radius:var(--r2);padding:14px;text-align:center;">
+            <div style="font-size:26px;font-weight:700;color:var(--ac);" id="exp-proj">0</div>
+            <div style="font-size:9px;color:var(--t2);margin-top:3px;letter-spacing:.1em;">โครงการ</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-sec">
+        <div class="set-title">ดาวน์โหลด</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button onclick="genPDF()"
+            style="display:flex;align-items:center;gap:12px;padding:15px 16px;
+            background:var(--s2);border:1px solid var(--br);border-radius:var(--r2);
+            color:var(--tx);font-family:var(--fn);font-size:12px;cursor:pointer;
+            text-align:left;transition:border-color .2s;">
+            <span style="font-size:22px;">📊</span>
+            <div>
+              <div style="font-weight:700;">รายงาน PDF / HTML</div>
+              <div style="font-size:9px;color:var(--t2);margin-top:2px;">พร้อมแผนที่ + ตาราง + รูปภาพ</div>
+            </div>
+          </button>
+          <button onclick="doCSV()"
+            style="display:flex;align-items:center;gap:12px;padding:15px 16px;
+            background:var(--s2);border:1px solid var(--br);border-radius:var(--r2);
+            color:var(--tx);font-family:var(--fn);font-size:12px;cursor:pointer;
+            text-align:left;transition:border-color .2s;">
+            <span style="font-size:22px;">📋</span>
+            <div>
+              <div style="font-weight:700;">ส่งออก CSV</div>
+              <div style="font-size:9px;color:var(--t2);margin-top:2px;">พิกัด GPS + ข้อมูลทั้งหมด</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       VIEWER PAGE
+  ══════════════════════════════════════ -->
   <div id="pg-viewer" class="page">
-    <div class="ph" style="background:#000">
+    <div class="ph" style="background:#000;border-bottom-color:rgba(255,255,255,.07);">
       <span class="pt" id="vtit">ภาพ 1/1</span>
       <button class="bk" onclick="goBack()">← กลับ</button>
     </div>
-    <div id="vwrap"><img id="vimg" alt=""></div>
+    <div id="vwrap">
+      <img id="vimg" alt="">
+      <button class="v-nav-btn" id="v-prev" onclick="navViewer(-1)">‹</button>
+      <button class="v-nav-btn" id="v-next" onclick="navViewer(1)">›</button>
+    </div>
     <div id="vbot">
-      <table class="itbl">
-        <tr><td class="lb">LAT</td><td class="vl" id="vilat">--</td></tr>
-        <tr><td class="lb">LNG</td><td class="vl" id="vilng">--</td></tr>
-        <tr><td class="lb">ALT</td><td class="vl" id="vialt">--</td></tr>
-        <tr><td class="lb">ACC</td><td class="vl" id="viacc">--</td></tr>
-        <tr><td class="lb">เวลา</td><td class="vl" id="vitm">--</td></tr>
-        <tr><td class="lb">วันที่</td><td class="vl" id="vidt">--</td></tr>
-        <tr><td class="lb">โครงการ</td><td class="vl" id="viproj">--</td></tr>
-      </table>
+      <!-- 2-col info grid -->
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="ic-lbl">LAT</div>
+          <div class="ic-val" id="vilat">--</div>
+        </div>
+        <div class="info-cell">
+          <div class="ic-lbl">LNG</div>
+          <div class="ic-val" id="vilng">--</div>
+        </div>
+        <div class="info-cell">
+          <div class="ic-lbl">ALT</div>
+          <div class="ic-val" id="vialt">--</div>
+        </div>
+        <div class="info-cell">
+          <div class="ic-lbl">ACC</div>
+          <div class="ic-val" id="viacc">--</div>
+        </div>
+      </div>
+      <div class="info-proj">
+        <div class="ic-lbl">เวลา</div>
+        <div class="ic-val"><span id="vitm">--</span> · <span id="vidt">--</span></div>
+      </div>
+      <div class="info-proj">
+        <div class="ic-lbl">โครงการ</div>
+        <div class="ic-val" id="viproj">--</div>
+      </div>
+      <!-- action buttons -->
       <div class="arow">
-        <button class="ab pr" onclick="uploadToCloud()" id="btn-upcloud">☁️ อัปโหลดซ้ำ</button>
+        <button class="ab pr" onclick="uploadToCloud()" id="btn-upcloud">☁️ อัปโหลด</button>
         <button class="ab pr" onclick="saveGal()">⬇ บันทึก</button>
         <button class="ab" onclick="showQR()">▦ QR</button>
         <button class="ab gm" onclick="openGM()">🗺 Maps</button>
         <button class="ab" onclick="shareP()">↗ แชร์</button>
-        <button class="ab rd" onclick="delP()">✕</button>
+        <button class="ab rd" onclick="delP()">✕ ลบ</button>
       </div>
     </div>
   </div>
 
-  <!-- MAP -->
+  <!-- ══════════════════════════════════════
+       MAP PAGE
+  ══════════════════════════════════════ -->
   <div id="pg-map" class="page">
-    <div class="ph"><span class="pt">แผนที่สำรวจ</span><button class="bk" onclick="goBack()">← กลับ</button></div>
+    <div class="ph">
+      <span class="pt">🗺 แผนที่สำรวจ</span>
+      <button class="bk" onclick="goBack()">← กลับ</button>
+    </div>
     <div id="mcon" style="position:relative;">
       <div id="map-filter-bar"></div>
       <div id="lmap"></div>
-      <div class="mleg"><b id="mcount">0</b> จุด · <span id="offline-status">online</span></div>
+      <div class="mleg">
+        <b id="mcount">0</b> จุด · <span id="offline-status">online</span>
+      </div>
     </div>
   </div>
 
-</div>
+</div><!-- /app -->
 
-<!-- PROJECT SELECT MODAL -->
+<!-- PROJECT MODAL (bottom sheet) -->
 <div id="proj-modal">
   <div id="proj-box">
     <div id="proj-header">
       <div id="proj-title">📋 เลือกโครงการ</div>
-      <div id="proj-sub">เลือกโครงการที่จะถ่ายภาพ หรือเพิ่มใหม่</div>
+      <div id="proj-sub">เลือกโครงการที่จะถ่ายภาพ</div>
     </div>
     <div id="proj-list"></div>
     <div id="proj-add-row">
       <input id="proj-new-inp" type="text" placeholder="ชื่อโครงการใหม่..." maxlength="60">
       <button id="proj-add-btn" onclick="addProject()">+ เพิ่ม</button>
     </div>
-
+    <div id="proj-actions">
+      <button id="proj-skip" onclick="closeProjModal()">ข้ามตอนนี้</button>
+    </div>
   </div>
 </div>
 
@@ -493,157 +1158,35 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 
 <!-- PDF PROGRESS -->
 <div id="pdf-modal">
-  <div class="pdf-title">📊 กำลังสร้าง PDF...</div>
+  <div class="pdf-title">📊 กำลังสร้างรายงาน...</div>
   <div class="pdf-sub" id="pdf-status">กำลังเตรียมข้อมูล</div>
   <div id="pdf-prog-bar"><div id="pdf-prog-fill"></div></div>
 </div>
 
-<div id="proj-badge" onclick="openProjModal(false)">📋 กำลังโหลด...</div>
 <div id="flash"></div>
 <div id="toast"></div>
 
+<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-<style>
-/* Custom cluster style */
-.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(0,229,176,0.25)!important;}
-.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{
-  background:rgba(0,229,176,0.85)!important;color:#000!important;font-weight:700!important;
-  font-family:monospace!important;font-size:12px!important;}
-.survey-marker{
-  background:#00e5b0;color:#000;font-size:10px;font-weight:700;
-  font-family:monospace;width:30px;height:30px;
-  border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-  display:flex;align-items:center;justify-content:center;
-  border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.5);}
-.survey-marker span{transform:rotate(45deg);}
-.survey-marker.multi{background:#f59e0b;}
-.leaflet-popup-content-wrapper{
-  background:#0e1420!important;border:1px solid rgba(0,229,176,0.3)!important;
-  border-radius:12px!important;box-shadow:0 8px 32px rgba(0,0,0,.6)!important;
-  padding:0!important;}
-.leaflet-popup-content{margin:0!important;width:220px!important;}
-.leaflet-popup-tip{background:#0e1420!important;}
-.leaflet-popup-close-button{color:#64748b!important;top:8px!important;right:8px!important;font-size:16px!important;}
-.pop-wrap{padding:12px;}
-.pop-img{width:100%;height:130px;object-fit:cover;border-radius:8px 8px 0 0;display:block;}
-.pop-badge{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.pop-num{background:rgba(0,229,176,0.15);color:#00e5b0;font-size:10px;font-weight:700;
-  padding:3px 8px;border-radius:20px;border:1px solid rgba(0,229,176,0.3);}
-.pop-sync{font-size:12px;}
-.pop-row{font-size:10px;color:#94a3b8;margin-bottom:3px;display:flex;gap:6px;}
-.pop-row b{color:#eef2ff;font-weight:600;}
-.pop-divider{border:none;border-top:1px solid rgba(255,255,255,0.07);margin:8px 0;}
-.pop-btn{display:block;width:100%;padding:8px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);
-  background:rgba(59,130,246,0.1);color:#60a5fa;font-family:monospace;font-size:10px;
-  text-align:center;text-decoration:none;cursor:pointer;margin-top:4px;}
-.pop-nav{display:flex;gap:6px;margin-top:6px;}
-.pop-nav-btn{flex:1;padding:7px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);
-  background:rgba(255,255,255,0.05);color:#94a3b8;font-family:monospace;font-size:10px;
-  cursor:pointer;text-align:center;}
-.pop-nav-btn:active{background:rgba(0,229,176,0.15);color:#00e5b0;border-color:rgba(0,229,176,0.3);}
-.pop-multi-header{background:rgba(245,158,11,0.1);border-bottom:1px solid rgba(245,158,11,0.2);
-  padding:8px 12px;border-radius:12px 12px 0 0;color:#f59e0b;font-size:10px;font-weight:700;
-  text-align:center;letter-spacing:.05em;}
-/* ── PROJECT MODAL ────────────────────────── */
-#proj-modal{
-  position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;
-  display:none;align-items:center;justify-content:center;padding:20px;}
-#proj-modal.show{display:flex;}
-#proj-box{
-  background:#0e1420;border:1px solid rgba(0,229,176,.25);border-radius:20px;
-  width:100%;max-width:380px;overflow:hidden;
-  box-shadow:0 20px 60px rgba(0,0,0,.7);}
-#proj-header{
-  background:linear-gradient(135deg,rgba(0,229,176,.12),rgba(59,130,246,.08));
-  padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.06);}
-#proj-title{font-size:16px;font-weight:700;color:#eef2ff;letter-spacing:.05em;margin-bottom:4px;}
-#proj-sub{font-size:11px;color:#64748b;}
-#proj-list{max-height:260px;overflow-y:auto;padding:10px 12px;}
-.proj-item{
-  display:flex;align-items:center;gap:10px;padding:11px 12px;
-  border-radius:12px;margin-bottom:6px;cursor:pointer;
-  border:1px solid rgba(255,255,255,.06);transition:all .15s;}
-.proj-item:active,.proj-item.sel{
-  background:rgba(0,229,176,.12);border-color:rgba(0,229,176,.35);}
-.proj-item-ico{
-  width:34px;height:34px;border-radius:10px;background:rgba(0,229,176,.1);
-  border:1px solid rgba(0,229,176,.2);display:flex;align-items:center;
-  justify-content:center;font-size:16px;flex-shrink:0;}
-.proj-item-info{flex:1;min-width:0;}
-.proj-item-name{font-size:13px;font-weight:600;color:#eef2ff;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.proj-item-count{font-size:10px;color:#64748b;margin-top:2px;}
-.proj-item-del{
-  width:28px;height:28px;border-radius:8px;border:none;
-  background:rgba(239,68,68,.08);color:#ef4444;font-size:14px;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-#proj-add-row{
-  display:flex;gap:8px;padding:12px 16px;
-  border-top:1px solid rgba(255,255,255,.06);}
-#proj-new-inp{
-  flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
-  color:#eef2ff;font-family:var(--fn);font-size:12px;padding:9px 12px;
-  border-radius:10px;outline:none;}
-#proj-new-inp:focus{border-color:rgba(0,229,176,.4);}
-#proj-add-btn{
-  background:rgba(0,229,176,.15);border:1px solid rgba(0,229,176,.35);
-  color:#00e5b0;font-family:var(--fn);font-size:11px;font-weight:700;
-  padding:9px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;}
-#proj-actions{padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.06);}
-#proj-skip{
-  width:100%;padding:10px;background:transparent;
-  border:1px solid rgba(255,255,255,.08);color:#64748b;
-  font-family:var(--fn);font-size:11px;border-radius:10px;cursor:pointer;}
-/* current project badge on camera */
-#proj-badge{
-  position:absolute;top:50px;left:50%;transform:translateX(-50%);
-  background:rgba(0,229,176,.15);border:1px solid rgba(0,229,176,.3);
-  color:#00e5b0;font-size:10px;font-weight:700;font-family:var(--fn);
-  padding:4px 12px;border-radius:20px;cursor:pointer;z-index:20;
-  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-/* ── MAP FILTER BAR ───────────────────────── */
-#map-filter-bar{
-  position:absolute;top:10px;left:50%;transform:translateX(-50%);
-  z-index:1000;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;
-  max-width:calc(100% - 80px);padding:0 4px;}
-.mf-chip{
-  background:rgba(14,20,32,.88);border:1px solid rgba(255,255,255,.12);
-  color:#94a3b8;font-family:var(--fn);font-size:10px;font-weight:600;
-  padding:6px 12px;border-radius:20px;cursor:pointer;
-  backdrop-filter:blur(8px);white-space:nowrap;
-  transition:all .15s;max-width:120px;overflow:hidden;text-overflow:ellipsis;}
-.mf-chip.active{
-  background:rgba(0,229,176,.18);border-color:rgba(0,229,176,.5);color:#00e5b0;}
-/* ── SETTINGS: projects section ───────────── */
-.proj-set-item{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:8px 10px;border-radius:10px;margin-bottom:4px;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);}
-.proj-set-name{font-size:12px;color:#eef2ff;flex:1;}
-.proj-set-count{font-size:10px;color:#64748b;margin-right:8px;}
-.proj-set-del{
-  background:transparent;border:none;color:#ef4444;font-size:14px;cursor:pointer;padding:2px 6px;}
-</style>
+
 <script>
 /* ================================================================
-   STATE & SETTINGS (Memory Only - No LocalStorage)
+   STATE
 ================================================================ */
 let photos = [], gps = null, bestGps = null, gpsHist = [];
 let facing = 'environment', stream = null, zLv = 1, zCaps = null;
 let stack = [], vIdx = -1, lmap = null;
 let timerRunning = false, lockPending = false;
 
-// URL ของ Google Apps Script เป็น Database หลัก
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzWbAhq8JDC6pjaMesTBQxX7Pgkgh-QzKfBBu03Y5JNR-EwuK6NnM-Er2lwTYLDiLwOsA/exec';
 
-// ค่าเริ่มต้น
 let cfg = { grid:false, timer:0, res:'4k', gpsThresh:15, qr:false, project:'' };
-let projects = []; // ['โครงการ A', 'โครงการ B', ...]
-let mapFilterProject = 'all'; // 'all' หรือ ชื่อโครงการ
+let projects = [];
+let mapFilterProject = 'all';
 
 const resMap = {
   '4k': {width:{ideal:4096},height:{ideal:2160}},
@@ -654,18 +1197,22 @@ const resMap = {
 /* ================================================================
    UTILS
 ================================================================ */
-const p2=n=>String(n).padStart(2,'0');
-const thY=y=>y+543;
-const fD=d=>`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${thY(d.getFullYear())}`;
-const fT=d=>`${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+const p2 = n => String(n).padStart(2,'0');
+const thY = y => y+543;
+const fD  = d => `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${thY(d.getFullYear())}`;
+const fT  = d => `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
 
-function toast(msg,type=''){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.className='show'+(type?' '+type:'');
-  clearTimeout(t._t); t._t=setTimeout(()=>t.className='',2800);
+function toast(msg, type=''){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' '+type : '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.className = '', 2800);
 }
 
-// โหลดข้อมูลจาก Google Apps Script ตอนเปิดแอป
+/* ================================================================
+   CLOUD: LOAD
+================================================================ */
 async function loadDataFromCloud() {
   if (!navigator.onLine) {
     toast('ไม่ได้เชื่อมต่ออินเทอร์เน็ต ข้อมูลจะไม่ซิงค์', 'bad');
@@ -673,98 +1220,102 @@ async function loadDataFromCloud() {
     finishInit();
     return;
   }
-  
   try {
-    const res = await fetch(GAS_URL + '?action=getData'); // ต้องมีการทำ GET endpoint ใน GAS
+    const res = await fetch(GAS_URL + '?action=getData');
     if (res.ok) {
       const data = await res.json();
       if (data.settings) {
-        // parse booleans/numbers correctly
         cfg.grid      = data.settings.grid === 'true';
         cfg.qr        = data.settings.qr === 'true';
         cfg.timer     = parseInt(data.settings.timer) || 0;
         cfg.gpsThresh = parseInt(data.settings.gpsThresh) || 15;
         cfg.res       = data.settings.res || '4k';
         cfg.project   = data.settings.project || '';
-        // โหลด projects list
         try { projects = data.settings.projects ? JSON.parse(data.settings.projects) : []; }
-        catch(e){ projects=[]; }
+        catch(e){ projects = []; }
       }
       if (data.photos && Array.isArray(data.photos)) photos = data.photos;
-      toast('ซิงค์ข้อมูลจาก Cloud สำเร็จ', 'ok');
+      toast('ซิงค์ข้อมูลสำเร็จ', 'ok');
     }
-  } catch (err) {
-    console.error('Error loading data from cloud:', err);
-    toast('เชื่อมต่อฐานข้อมูลล้มเหลว (ทำงานแบบออฟไลน์ชั่วคราว)', 'bad');
+  } catch(err) {
+    console.error(err);
+    toast('เชื่อมต่อล้มเหลว (ออฟไลน์ชั่วคราว)', 'bad');
   } finally {
     document.getElementById('splash').style.display = 'none';
     finishInit();
   }
 }
 
-// ── บันทึกการตั้งค่าทั้งหมดลง Sheet "ตั้งค่า" ────────────────────
+/* ================================================================
+   SETTINGS
+================================================================ */
 let _saveTimer = null;
 function saveSetting(k, v){
   cfg[k] = v;
-  // debounce 600ms เพื่อรวม call หลายๆ ตัวเป็นครั้งเดียว
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(saveAllSettings, 600);
 }
-
 function saveAllSettings(){
   if(!navigator.onLine) return;
   const payload = {
-    action: 'saveAllSettings',
-    settings: {
-      grid:    String(cfg.grid),
-      timer:   String(cfg.timer),
-      res:     String(cfg.res),
-      gpsThresh: String(cfg.gpsThresh),
-      qr:      String(cfg.qr),
-      project: String(cfg.project || ''),
-      projects: JSON.stringify(projects)
+    action:'saveAllSettings',
+    settings:{
+      grid:String(cfg.grid), timer:String(cfg.timer), res:String(cfg.res),
+      gpsThresh:String(cfg.gpsThresh), qr:String(cfg.qr),
+      project:String(cfg.project||''), projects:JSON.stringify(projects)
     }
   };
-  fetch(GAS_URL, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-    headers: {'Content-Type':'text/plain;charset=utf-8'}
-  }).then(r=>r.json()).then(res=>{
-    if(res.status==='success') toast('✓ บันทึกตั้งค่าแล้ว','ok');
-  }).catch(e=>console.error('saveAllSettings failed:',e));
+  fetch(GAS_URL, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}})
+    .then(r=>r.json())
+    .then(res=>{ if(res.status==='success') toast('✓ บันทึกตั้งค่าแล้ว','ok'); })
+    .catch(e=>console.error(e));
 }
-
 function togSetting(k){
-  cfg[k]=!cfg[k]; 
+  cfg[k] = !cfg[k];
   saveSetting(k, cfg[k]);
-  document.getElementById('tog-'+k).classList.toggle('on',cfg[k]);
-  if(k==='grid') document.getElementById('grid-overlay').classList.toggle('show',cfg[k]);
+  document.getElementById('tog-'+k).classList.toggle('on', cfg[k]);
+  if(k==='grid') document.getElementById('grid-overlay').classList.toggle('show', cfg[k]);
 }
-
 function updCnt(){
-  const n=photos.length;
-  document.getElementById('ncount').textContent=n;
-  const c=document.getElementById('gcnt');
-  if(n>0){c.style.display='block';c.textContent=n;}else c.style.display='none';
-  if(n>0){
-    const thumbSrc = photos[0].uploaded && photos[0].dataURL && photos[0].dataURL.startsWith('http') ? getDriveImgUrl(photos[0].dataURL) : photos[0].dataURL;
-    document.getElementById('gthumb').src=thumbSrc;
-    document.getElementById('gthumb').style.display='block';
-    document.getElementById('gicon').style.display='none';
+  const n = photos.length;
+  document.getElementById('ncount').textContent = n;
+  // gallery btn
+  const c = document.getElementById('gcnt');
+  if(n > 0){
+    c.style.display = 'flex';
+    c.textContent = n > 99 ? '99+' : n;
+    const p0 = photos[0];
+    const src = p0.uploaded && p0.dataURL?.startsWith('http') ? getDriveImgUrl(p0.dataURL) : p0.dataURL;
+    document.getElementById('gthumb').src = src;
+    document.getElementById('gthumb').style.display = 'block';
+    document.getElementById('gicon').style.display = 'none';
+  } else {
+    c.style.display = 'none';
+    document.getElementById('gthumb').style.display = 'none';
+    document.getElementById('gicon').style.display = '';
   }
-  const pi=document.getElementById('photo-count-info');
-  if(pi) pi.textContent=n+' รูป';
+  // export page stats
+  const expT = document.getElementById('exp-total');
+  if(expT){
+    expT.textContent = n;
+    document.getElementById('exp-gps').textContent = photos.filter(p=>p.lat).length;
+    document.getElementById('exp-unup').textContent = photos.filter(p=>!p.uploaded).length;
+    document.getElementById('exp-proj').textContent = [...new Set(photos.filter(p=>p.project).map(p=>p.project))].length;
+  }
+  const pi = document.getElementById('photo-count-info');
+  if(pi) pi.textContent = n + ' รูป ใน Cloud';
+  const pcl = document.getElementById('photos-count-lbl');
+  if(pcl) pcl.textContent = n + ' รูป';
 }
-
 function loadSettingsUI(){
-  document.getElementById('tog-grid').classList.toggle('on',cfg.grid);
-  document.getElementById('tog-qr').classList.toggle('on',cfg.qr);
-  document.getElementById('sel-timer').value=cfg.timer;
-  document.getElementById('sel-res').value=cfg.res;
-  document.getElementById('sel-gps').value=cfg.gpsThresh;
-  document.getElementById('inp-project').value=cfg.project||'';
-  const lbl=document.getElementById('inp-project-label');
-  if(lbl) lbl.textContent=cfg.project||'เลือก...';
+  document.getElementById('tog-grid').classList.toggle('on', cfg.grid);
+  document.getElementById('tog-qr').classList.toggle('on', cfg.qr);
+  document.getElementById('sel-timer').value = cfg.timer;
+  document.getElementById('sel-res').value = cfg.res;
+  document.getElementById('sel-gps').value = cfg.gpsThresh;
+  document.getElementById('inp-project').value = cfg.project || '';
+  const lbl = document.getElementById('inp-project-label');
+  if(lbl) lbl.textContent = cfg.project || 'เลือก...';
   if(cfg.grid) document.getElementById('grid-overlay').classList.add('show');
   renderProjBadge();
   renderProjSetList();
@@ -776,51 +1327,54 @@ function loadSettingsUI(){
 function renderProjBadge(){
   const b = document.getElementById('proj-badge');
   b.textContent = cfg.project ? '📋 '+cfg.project : '📋 เลือกโครงการ...';
+  b.classList.toggle('no-proj', !cfg.project);
 }
-
 function openProjModal(isFirstOpen){
   const modal = document.getElementById('proj-modal');
   modal.classList.add('show');
-  modal.dataset.required = isFirstOpen ? '1' : '0'; // ถ้า required กดปิดไม่ได้
-  // อัปเดต sub-text
+  modal.dataset.required = isFirstOpen ? '1' : '0';
   const sub = document.getElementById('proj-sub');
-  if(sub) sub.textContent = isFirstOpen
-    ? 'กรุณาเลือกโครงการก่อนเริ่มถ่ายภาพ'
-    : 'เลือกโครงการที่จะถ่ายภาพ หรือเพิ่มใหม่';
+  if(sub) sub.textContent = isFirstOpen ? 'กรุณาเลือกโครงการก่อนเริ่มถ่ายภาพ' : 'เลือกโครงการที่จะถ่ายภาพ';
+  // show/hide skip button
+  const skip = document.getElementById('proj-skip');
+  const actions = document.getElementById('proj-actions');
+  if(skip){ skip.textContent = isFirstOpen ? 'ข้ามตอนนี้' : 'ปิด'; }
   renderProjModalList();
-  const inp = document.getElementById('proj-new-inp');
-  inp.value='';
+  document.getElementById('proj-new-inp').value = '';
 }
-
+function closeProjModal(){
+  document.getElementById('proj-modal').classList.remove('show');
+}
 function renderProjModalList(){
   const list = document.getElementById('proj-list');
   if(!projects.length){
-    list.innerHTML='<div style="text-align:center;color:#64748b;font-size:11px;padding:20px 0;">ยังไม่มีโครงการ กรุณาเพิ่มด้านล่าง</div>';
+    list.innerHTML = '<div style="text-align:center;color:var(--t2);font-size:11px;padding:24px 0;line-height:2;">ยังไม่มีโครงการ<br>เพิ่มด้านล่างได้เลย</div>';
     return;
   }
   list.innerHTML = projects.map(pj => {
     const cnt = photos.filter(p=>p.project===pj).length;
-    const isCur = cfg.project===pj;
-    return `<div class="proj-item${isCur?' sel':''}" onclick="selectProject('${pj.replace(/'/g,'\'').replace(/"/g,'&quot;')}')">
+    const isCur = cfg.project === pj;
+    const safe = pj.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return `<div class="proj-item${isCur?' sel':''}" onclick="selectProject('${safe}')">
       <div class="proj-item-ico">🏗</div>
       <div class="proj-item-info">
         <div class="proj-item-name">${pj}</div>
-        <div class="proj-item-count">${cnt} รูป</div>
+        <div class="proj-item-count">${cnt} รูป${isCur?' · ✓ ใช้งานอยู่':''}</div>
       </div>
-      <button class="proj-item-del" onclick="event.stopPropagation();deleteProject('${pj.replace(/'/g,'\'').replace(/"/g,'&quot;')}')">✕</button>
+      <button class="proj-item-del" onclick="event.stopPropagation();deleteProject('${safe}')">✕</button>
     </div>`;
   }).join('');
 }
-
 function selectProject(name){
   cfg.project = name || '';
   saveSetting('project', cfg.project);
-  document.getElementById('proj-modal').classList.remove('show');
+  closeProjModal();
   document.getElementById('inp-project').value = cfg.project;
+  const lbl = document.getElementById('inp-project-label');
+  if(lbl) lbl.textContent = cfg.project || 'เลือก...';
   renderProjBadge();
   toast(name ? '✓ เลือกโครงการ: '+name : 'ไม่ระบุโครงการ', 'ok');
 }
-
 function addProject(){
   const inp = document.getElementById('proj-new-inp');
   const name = inp.value.trim();
@@ -828,12 +1382,11 @@ function addProject(){
   if(projects.includes(name)){ toast('มีโครงการนี้แล้ว','bad'); return; }
   projects.push(name);
   saveProjectsToCloud();
-  inp.value='';
+  inp.value = '';
   renderProjModalList();
   renderProjSetList();
   toast('✓ เพิ่มโครงการ: '+name,'ok');
 }
-
 function addProjectFromSettings(){
   const inp = document.getElementById('proj-set-inp');
   const name = inp.value.trim();
@@ -841,54 +1394,57 @@ function addProjectFromSettings(){
   if(projects.includes(name)){ toast('มีโครงการนี้แล้ว','bad'); return; }
   projects.push(name);
   saveProjectsToCloud();
-  inp.value='';
+  inp.value = '';
   renderProjSetList();
   toast('✓ เพิ่มโครงการ: '+name,'ok');
 }
-
 function deleteProject(name){
-  if(!confirm('ลบโครงการ "'+name+'" ออกจากรายการ? (รูปภาพที่ผูกโครงการนี้ไว้จะยังอยู่)')) return;
+  if(!confirm('ลบโครงการ "'+name+'" ?')) return;
   projects = projects.filter(p=>p!==name);
   if(cfg.project===name){ cfg.project=''; saveSetting('project',''); renderProjBadge(); }
   saveProjectsToCloud();
   renderProjModalList();
   renderProjSetList();
 }
-
 function renderProjSetList(){
   const el = document.getElementById('proj-set-list');
   if(!el) return;
   if(!projects.length){
-    el.innerHTML='<div style="color:#64748b;font-size:11px;padding:8px 2px;">ยังไม่มีโครงการ</div>';
+    el.innerHTML = '<div style="color:var(--t2);font-size:11px;padding:8px 2px;">ยังไม่มีโครงการ</div>';
     return;
   }
-  el.innerHTML = projects.map(pj=>{
+  el.innerHTML = projects.map(pj => {
     const cnt = photos.filter(p=>p.project===pj).length;
+    const safe = pj.replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<div class="proj-set-item">
       <span class="proj-set-name">${pj}</span>
       <span class="proj-set-count">${cnt} รูป</span>
-      <button class="proj-set-del" onclick="deleteProject('${pj.replace(/'/g,'\'').replace(/"/g,'&quot;')}')">✕</button>
+      <button class="proj-set-del" onclick="deleteProject('${safe}')">✕</button>
     </div>`;
   }).join('');
 }
-
-function saveProjectsToCloud(){
-  // รวมไปกับ saveAllSettings เพื่อบันทึกลง Sheet ตั้งค่าเดียว
-  saveAllSettings();
-}
+function saveProjectsToCloud(){ saveAllSettings(); }
 
 /* ================================================================
-   PAGE NAV
+   PAGE NAVIGATION
 ================================================================ */
 function goPg(name){
   stack.push(name);
   document.getElementById('pg-'+name)?.classList.add('active');
   if(name==='photos') renderPhotos();
   if(name==='map') initMap();
+  if(name==='export') updCnt();
 }
 function goBack(){
   if(!stack.length) return;
-  document.getElementById('pg-'+stack.pop())?.classList.remove('active');
+  const name = stack.pop();
+  document.getElementById('pg-'+name)?.classList.remove('active');
+  // reset tab highlight if going back from a root page
+  if(!stack.length) switchTab(document.querySelector('.ntab'),'cam');
+}
+function switchTab(el, name){
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
 }
 
 /* ================================================================
@@ -896,74 +1452,56 @@ function goBack(){
 ================================================================ */
 function startGPS(){
   if(!navigator.geolocation){ toast('ไม่รองรับ GPS','bad'); return; }
-
-  // เรียก getCurrentPosition ซ้ำๆ ทุก 2 วินาที เพื่อสะสม sample แม่นขึ้น
-  // แทนที่จะพึ่ง watchPosition อย่างเดียว
-  function requestHighAccuracy(){
+  function pollHP(){
     navigator.geolocation.getCurrentPosition(pos=>{
       onGPS(pos);
-      setTimeout(requestHighAccuracy, 2000); // poll ซ้ำ
+      setTimeout(pollHP, 2000);
     }, ()=>{}, {enableHighAccuracy:true, maximumAge:0, timeout:8000});
   }
-
-  // watchPosition: แจ้งเตือนทันทีเมื่อมีการเปลี่ยนแปลง
   navigator.geolocation.watchPosition(onGPS, ()=>{
-    document.getElementById('hgps').className='err';
-    document.getElementById('hgps').textContent='ไม่มี GPS';
+    document.getElementById('hgps').className = 'err';
+    document.getElementById('hgps').textContent = 'ไม่มี GPS';
     document.getElementById('bshut').classList.add('ng');
-    document.getElementById('mfill').style.width='100%';
-    document.getElementById('mfill').style.background='#ef4444';
+    document.getElementById('mfill').style.width = '100%';
+    document.getElementById('mfill').style.background = '#f04444';
   },{enableHighAccuracy:true, maximumAge:0, timeout:15000});
-
-  requestHighAccuracy(); // เริ่ม poll ทันที
+  pollHP();
 }
-
 function onGPS(pos){
-  const c={lat:pos.coords.latitude,lng:pos.coords.longitude,
-           alt:pos.coords.altitude,acc:pos.coords.accuracy,ts:Date.now()};
-  gps=c;
+  const c = {lat:pos.coords.latitude, lng:pos.coords.longitude, alt:pos.coords.altitude, acc:pos.coords.accuracy, ts:Date.now()};
+  gps = c;
   gpsHist.push(c);
-  if(gpsHist.length>20) gpsHist.shift(); // เก็บ 20 sample
-
-  // bestGps = ค่าที่แม่นสุดใน history
+  if(gpsHist.length > 20) gpsHist.shift();
   bestGps = gpsHist.reduce((a,b)=>b.acc<a.acc?b:a, gpsHist[0]);
-
-  // weighted average จาก sample ที่ acc < 30m (ถ้ามีมากพอ)
   const good = gpsHist.filter(g=>g.acc<30);
   if(good.length >= 3){
     const sumW = good.reduce((s,g)=>s+(1/g.acc),0);
     const wLat = good.reduce((s,g)=>s+(g.lat/g.acc),0)/sumW;
     const wLng = good.reduce((s,g)=>s+(g.lng/g.acc),0)/sumW;
     const minAcc = Math.min(...good.map(g=>g.acc));
-    // อัปเดต bestGps ด้วย weighted ถ้าดีกว่า
-    if(minAcc <= bestGps.acc){
-      bestGps = {lat:wLat, lng:wLng, alt:c.alt, acc:minAcc, ts:Date.now()};
-    }
+    if(minAcc <= bestGps.acc) bestGps = {lat:wLat, lng:wLng, alt:c.alt, acc:minAcc, ts:Date.now()};
   }
+  const pct = Math.max(0, Math.min(100, 100-(c.acc/100)*100));
+  const mf = document.getElementById('mfill');
+  mf.style.width = pct+'%';
+  mf.style.background = c.acc<8?'#00dba4':c.acc<15?'#84cc16':c.acc<40?'#f5a623':'#f04444';
 
-  const pct=Math.max(0,Math.min(100,100-(c.acc/100)*100));
-  const mf=document.getElementById('mfill');
-  mf.style.width=pct+'%';
-  mf.style.background=c.acc<8?'#00e5b0':c.acc<15?'#84cc16':c.acc<40?'#f59e0b':'#ef4444';
-
-  const hg=document.getElementById('hgps'), a=Math.round(c.acc), ba=Math.round(bestGps.acc);
-  if(c.acc<cfg.gpsThresh){
-    hg.className='';
-    hg.textContent = ba<a ? `GPS ±${a}m (best±${ba}m) ✓` : `GPS ±${a}m ✓`;
-  } else if(c.acc<50){
-    hg.className='warn';
-    hg.textContent=`GPS ±${a}m${ba<a?' (best±'+ba+'m)':''}`;
+  const hg = document.getElementById('hgps'), a = Math.round(c.acc), ba = Math.round(bestGps.acc);
+  if(c.acc < cfg.gpsThresh){
+    hg.className = ''; hg.textContent = `GPS ±${a}m ✓`;
+  } else if(c.acc < 50){
+    hg.className = 'warn'; hg.textContent = `GPS ±${a}m`;
   } else {
-    hg.className='err'; hg.textContent=`GPS อ่อน ±${a}m`;
+    hg.className = 'err'; hg.textContent = `GPS อ่อน ±${a}m`;
   }
-  document.getElementById('olat').textContent=bestGps.lat.toFixed(7)+'°';
-  document.getElementById('olng').textContent=bestGps.lng.toFixed(7)+'°';
-  document.getElementById('oalt').textContent=c.alt?c.alt.toFixed(1)+' m':'--';
-  document.getElementById('oacc').textContent='±'+a+' m (best±'+ba+'m)';
-  document.getElementById('lacv').textContent='±'+a+' m';
+  document.getElementById('olat').textContent = bestGps.lat.toFixed(6)+'°';
+  document.getElementById('olng').textContent = bestGps.lng.toFixed(6)+'°';
+  document.getElementById('oalt').textContent = c.alt ? c.alt.toFixed(1)+' m' : '--';
+  document.getElementById('oacc').textContent = '±'+a+'m';
+  document.getElementById('lacv').textContent = '±'+a+' m';
   document.getElementById('bshut').classList.remove('ng');
-  if(lockPending&&c.acc<=cfg.gpsThresh){
-    lockPending=false;
+  if(lockPending && c.acc <= cfg.gpsThresh){
+    lockPending = false;
     document.getElementById('glock').classList.remove('show');
     startTimerOrCapture();
   }
@@ -973,22 +1511,29 @@ function onGPS(pos){
    CLOCK
 ================================================================ */
 function startClock(){
-  const tick=()=>{const d=new Date();document.getElementById('hclock').textContent=fT(d);document.getElementById('otime').textContent=fT(d);document.getElementById('odate').textContent=fD(d);};
-  tick(); setInterval(tick,1000);
+  const tick = () => {
+    const d = new Date();
+    document.getElementById('hclock').textContent = fT(d);
+    document.getElementById('otime').textContent  = fT(d);
+    document.getElementById('odate').textContent  = fD(d);
+  };
+  tick(); setInterval(tick, 1000);
 }
 
 /* ================================================================
    CAMERA
 ================================================================ */
 async function startCam(f){
-  if(stream)stream.getTracks().forEach(t=>t.stop());
+  if(stream) stream.getTracks().forEach(t=>t.stop());
   try{
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:f,...resMap[cfg.res]},audio:false});
-    document.getElementById('video').srcObject=stream;
-    const tr=stream.getVideoTracks()[0];
-    const cp=tr.getCapabilities?tr.getCapabilities():{};
-    zCaps=cp.zoom||null; zLv=1; document.getElementById('zlbl').textContent='1×'; applyZ();
-  }catch(e){toast('ไม่สามารถเปิดกล้องได้','bad');}
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:f,...resMap[cfg.res]},audio:false});
+    document.getElementById('video').srcObject = stream;
+    const tr = stream.getVideoTracks()[0];
+    const cp = tr.getCapabilities ? tr.getCapabilities() : {};
+    zCaps = cp.zoom || null; zLv = 1;
+    document.getElementById('zlbl').textContent = '1×';
+    applyZ();
+  } catch(e){ toast('ไม่สามารถเปิดกล้องได้','bad'); }
 }
 function restartCam(){ startCam(facing); }
 function flipCam(){
@@ -996,241 +1541,207 @@ function flipCam(){
   startCam(facing);
 }
 function applyZ(){
-  if(zCaps)stream?.getVideoTracks()[0]?.applyConstraints({advanced:[{zoom:zLv}]}).catch(()=>{});
-  else{const v=document.getElementById('video');v.style.transform=`scale(${zLv})`;v.style.transformOrigin='center';}
-  document.getElementById('zlbl').textContent=zLv.toFixed(1)+'×';
+  if(zCaps) stream?.getVideoTracks()[0]?.applyConstraints({advanced:[{zoom:zLv}]}).catch(()=>{});
+  else { const v=document.getElementById('video'); v.style.transform=`scale(${zLv})`; v.style.transformOrigin='center'; }
+  document.getElementById('zlbl').textContent = zLv.toFixed(1)+'×';
 }
-function zIn(){zLv=Math.min(zLv+0.5,zCaps?zCaps.max||8:4);applyZ();}
-function zOut(){zLv=Math.max(zLv-0.5,1);applyZ();}
-let p0=null,z0=1;
-document.addEventListener('touchstart',e=>{if(e.touches.length===2&&document.getElementById('vf').contains(e.target)){p0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);z0=zLv;}},{passive:true});
-document.addEventListener('touchmove',e=>{if(e.touches.length===2&&p0){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);zLv=Math.max(1,Math.min(z0*(d/p0),4));applyZ();}},{passive:true});
-document.addEventListener('touchend',()=>{p0=null;},{passive:true});
+function zIn(){ zLv = Math.min(zLv+0.5, zCaps?zCaps.max||8:4); applyZ(); }
+function zOut(){ zLv = Math.max(zLv-0.5, 1); applyZ(); }
+let p0=null, z0=1;
+document.addEventListener('touchstart',e=>{
+  if(e.touches.length===2 && document.getElementById('vf').contains(e.target)){
+    p0 = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    z0 = zLv;
+  }
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if(e.touches.length===2 && p0){
+    const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    zLv = Math.max(1, Math.min(z0*(d/p0), 4));
+    applyZ();
+  }
+},{passive:true});
+document.addEventListener('touchend',()=>{ p0=null; },{passive:true});
 
 /* ================================================================
    SHUTTER + TIMER
 ================================================================ */
 function pressShutter(){
   if(timerRunning) return;
-  if(!gps){lockPending=true;document.getElementById('glock').classList.add('show');return;}
-  if(gps.acc>cfg.gpsThresh){lockPending=true;document.getElementById('glock').classList.add('show');return;}
+  if(!gps){ lockPending=true; document.getElementById('glock').classList.add('show'); return; }
+  if(gps.acc > cfg.gpsThresh){ lockPending=true; document.getElementById('glock').classList.add('show'); return; }
   startTimerOrCapture();
 }
-function skipLock(){lockPending=false;document.getElementById('glock').classList.remove('show');startTimerOrCapture();}
-
+function skipLock(){ lockPending=false; document.getElementById('glock').classList.remove('show'); startTimerOrCapture(); }
 function startTimerOrCapture(){
-  const sec=parseInt(cfg.timer)||0;
-  if(sec===0){doCapture();return;}
-  timerRunning=true;
-  const td=document.getElementById('timer-display');
-  td.style.display='block'; td.textContent=sec;
-  let remaining=sec;
-  const iv=setInterval(()=>{
+  const sec = parseInt(cfg.timer) || 0;
+  if(sec === 0){ doCapture(); return; }
+  timerRunning = true;
+  const td = document.getElementById('timer-display');
+  td.style.display = 'block'; td.textContent = sec;
+  let remaining = sec;
+  const iv = setInterval(()=>{
     remaining--;
-    if(remaining<=0){clearInterval(iv);td.style.display='none';timerRunning=false;doCapture();}
-    else td.textContent=remaining;
-  },1000);
+    if(remaining <= 0){ clearInterval(iv); td.style.display='none'; timerRunning=false; doCapture(); }
+    else td.textContent = remaining;
+  }, 1000);
 }
 
 /* ================================================================
-   CAPTURE & AUTO UPLOAD TO CLOUD
+   CAPTURE
 ================================================================ */
 function doCapture(){
-  const v=document.getElementById('video');
-  if(!v.videoWidth){toast('กล้องยังไม่พร้อม','bad');return;}
-  const bs=document.getElementById('bshut');
-  bs.classList.add('fl'); document.getElementById('flash').classList.add('on');
-  setTimeout(()=>{document.getElementById('flash').classList.remove('on');bs.classList.remove('fl');},140);
+  const v = document.getElementById('video');
+  if(!v.videoWidth){ toast('กล้องยังไม่พร้อม','bad'); return; }
+  const bs = document.getElementById('bshut');
+  bs.classList.add('fl');
+  document.getElementById('flash').classList.add('on');
+  setTimeout(()=>{ document.getElementById('flash').classList.remove('on'); bs.classList.remove('fl'); }, 140);
 
-  const W=v.videoWidth,H=v.videoHeight;
+  const W=v.videoWidth, H=v.videoHeight;
   const cv=document.getElementById('cvs'); cv.width=W; cv.height=H;
   const ctx=cv.getContext('2d');
-  if(facing==='user'){ctx.translate(W,0);ctx.scale(-1,1);}
-  ctx.drawImage(v,0,0,W,H);
-  if(facing==='user')ctx.setTransform(1,0,0,1,0,0);
+  if(facing==='user'){ ctx.translate(W,0); ctx.scale(-1,1); }
+  ctx.drawImage(v, 0, 0, W, H);
+  if(facing==='user') ctx.setTransform(1,0,0,1,0,0);
 
-  const ug=bestGps||gps;
-  const now=new Date();
-  const fSz=Math.round(W*0.038);
-  const lh=fSz*1.7, pd=fSz*0.9;
-
+  const ug = bestGps || gps;
+  const now = new Date();
+  const fSz = Math.round(W*0.038);
+  const lh = fSz*1.7, pd = fSz*0.9;
   const proj = cfg.project || '';
   const org  = 'ทต.บ้านยาง จ.ชัยภูมิ';
-  const lines=ug?[
-    {t:`LAT  ${ug.lat.toFixed(6)}°`,c:'#ffffff'},
-    {t:`LNG  ${ug.lng.toFixed(6)}°`,c:'#ffffff'},
-    {t:`ALT  ${ug.alt?ug.alt.toFixed(1)+' m':'--'}   ACC ±${Math.round(ug.acc)} m`,c:'#94a3b8'},
-    {t:`${fD(now)}  ${fT(now)}`,c:'#e2e8f0'},
-    ...(proj ? [{t:proj, c:'#00e5b0'}] : []),
+  const lines = ug ? [
+    {t:`LAT  ${ug.lat.toFixed(6)}°`, c:'#ffffff'},
+    {t:`LNG  ${ug.lng.toFixed(6)}°`, c:'#ffffff'},
+    {t:`ALT  ${ug.alt?ug.alt.toFixed(1)+' m':'--'}   ACC ±${Math.round(ug.acc)} m`, c:'#94a3b8'},
+    {t:`${fD(now)}  ${fT(now)}`, c:'#e2e8f0'},
+    ...(proj ? [{t:proj, c:'#00dba4'}] : []),
     {t:org, c:'#7dd3fc'},
-  ]:[
-    {t:`[ไม่มีข้อมูล GPS]`,c:'#f59e0b'},
-    {t:`${fD(now)}  ${fT(now)}`,c:'#e2e8f0'},
-    ...(proj ? [{t:proj, c:'#00e5b0'}] : []),
+  ] : [
+    {t:`[ไม่มีข้อมูล GPS]`, c:'#f5a623'},
+    {t:`${fD(now)}  ${fT(now)}`, c:'#e2e8f0'},
+    ...(proj ? [{t:proj, c:'#00dba4'}] : []),
     {t:org, c:'#7dd3fc'},
   ];
 
-  ctx.font=`bold ${fSz}px "Courier New",monospace`;
-  const tw=lines.reduce((a,l)=>Math.max(a,ctx.measureText(l.t).width),0);
+  ctx.font = `bold ${fSz}px "Courier New",monospace`;
+  const tw = lines.reduce((a,l)=>Math.max(a,ctx.measureText(l.t).width), 0);
+  const qrSz = cfg.qr&&ug ? Math.round(fSz*4.5) : 0;
+  const bh = lines.length*lh+pd*1.5;
+  const bx = pd*0.4, by = H-bh, bw = tw+pd*2.4+(qrSz>0?qrSz+pd:0), rr = fSz*0.4;
 
-  // ถ้าเปิด QR — เพิ่มพื้นที่ขวา
-  const qrSz=cfg.qr&&ug?Math.round(fSz*4.5):0;
-  const bh=lines.length*lh+pd*1.5;
-  const bx=pd*0.4, by=H-bh, bw=tw+pd*2.4+(qrSz>0?qrSz+pd:0), rr=fSz*0.4;
-
-  ctx.fillStyle='rgba(8,12,18,0.82)';
+  ctx.fillStyle='rgba(6,10,16,0.85)';
   ctx.beginPath();
   ctx.moveTo(bx+rr,by); ctx.lineTo(bx+bw-rr,by);
   ctx.arcTo(bx+bw,by,bx+bw,by+rr,rr); ctx.lineTo(bx+bw,by+bh);
   ctx.lineTo(bx,by+bh); ctx.lineTo(bx,by+rr);
   ctx.arcTo(bx,by,bx+rr,by,rr); ctx.closePath(); ctx.fill();
-  ctx.fillStyle='#00e5b0'; ctx.fillRect(bx,by+rr,Math.max(3,fSz*0.09),bh-rr);
+  ctx.fillStyle='#00dba4'; ctx.fillRect(bx, by+rr, Math.max(3,fSz*0.09), bh-rr);
 
-  lines.forEach((l,i)=>{ctx.fillStyle=l.c;ctx.fillText(l.t,bx+pd,by+pd*0.9+(i+1)*lh);});
+  lines.forEach((l,i)=>{ ctx.fillStyle=l.c; ctx.fillText(l.t, bx+pd, by+pd*0.9+(i+1)*lh); });
 
-  // วาด QR Code ถ้าเปิดใช้
-  if(cfg.qr&&ug){
+  if(cfg.qr && ug){
     const qUrl=`https://maps.google.com/?q=${ug.lat},${ug.lng}`;
-    const qcv=document.createElement('canvas');
     if(window.QRCode){
       const qr=new QRCode(document.createElement('div'),{text:qUrl,width:qrSz,height:qrSz,correctLevel:QRCode.CorrectLevel.M});
       setTimeout(()=>{
         const qimg=qr._el.querySelector('img');
-        if(qimg) ctx.drawImage(qimg,bx+tw+pd*2.8,by+(bh-qrSz)/2,qrSz,qrSz);
+        if(qimg) ctx.drawImage(qimg, bx+tw+pd*2.8, by+(bh-qrSz)/2, qrSz, qrSz);
       },100);
-    } else {
-      ctx.fillStyle='#fff';ctx.font=`${fSz*0.6}px monospace`;
-      ctx.fillText('SCAN:',bx+tw+pd*3,by+pd*1.5);
-      ctx.fillText(ug.lat.toFixed(4)+',',bx+tw+pd*3,by+pd*1.5+fSz*0.7);
-      ctx.fillText(ug.lng.toFixed(4),bx+tw+pd*3,by+pd*1.5+fSz*1.4);
     }
   }
 
-  const url=cv.toDataURL('image/jpeg',0.92);
-  const entry={id:Date.now(),dataURL:url,
-    lat:ug?.lat??null,lng:ug?.lng??null,alt:ug?.alt??null,acc:ug?.acc??null,
-    dt:now.toISOString(),project:cfg.project||'', uploaded: false}; 
-    
-  photos.unshift(entry); // เก็บใน Memory (RAM) เท่านั้น
+  const url = cv.toDataURL('image/jpeg', 0.92);
+  const entry = {
+    id:Date.now(), dataURL:url,
+    lat:ug?.lat??null, lng:ug?.lng??null, alt:ug?.alt??null, acc:ug?.acc??null,
+    dt:now.toISOString(), project:cfg.project||'', uploaded:false
+  };
+  photos.unshift(entry);
   updCnt();
-  toast(ug?`✓ ถ่ายภาพแล้ว · GPS ±${Math.round(ug.acc)}m`:'✓ ถ่ายภาพแล้ว (ไม่มี GPS)','ok');
-
-  // ทำการอัปโหลดอัตโนมัติทันที
+  toast(ug ? `✓ ถ่ายภาพแล้ว · GPS ±${Math.round(ug.acc)}m` : '✓ ถ่ายภาพแล้ว (ไม่มี GPS)', 'ok');
   autoUploadCurrentPhoto(entry);
 }
 
-// อัปโหลดขึ้น Cloud (แทนการบันทึกลง LocalStorage)
-async function autoUploadCurrentPhoto(p) {
-  if(!navigator.onLine) {
-    toast('ไม่มีเน็ต รูปจะอยู่ในหน่วยความจำเครื่องชั่วคราวเท่านั้น', 'bad');
-    return;
-  }
-  
+/* ================================================================
+   CLOUD: UPLOAD
+================================================================ */
+async function autoUploadCurrentPhoto(p){
+  if(!navigator.onLine){ toast('ไม่มีเน็ต รูปอยู่ในหน่วยความจำชั่วคราว','bad'); return; }
   const d = new Date(p.dt);
   const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
-
-  const payload = {
-    action: 'uploadPhoto', // กำหนด Action ให้แน่ชัดสำหรับ GAS
-    id: p.id,
-    dataURL: p.dataURL,
-    filename: fname,
-    lat: p.lat || '', lng: p.lng || '', alt: p.alt || '', acc: p.acc || '',
-    dt: p.dt, project: p.project || ''
-  };
-
+  const payload = {action:'uploadPhoto', id:p.id, dataURL:p.dataURL, filename:fname, lat:p.lat||'', lng:p.lng||'', alt:p.alt||'', acc:p.acc||'', dt:p.dt, project:p.project||''};
   try {
-    toast('☁️ กำลังซิงค์ขึ้น Cloud...', 'ok');
-    const res = await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    });
+    toast('☁️ กำลังซิงค์...');
+    const res = await fetch(GAS_URL, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}});
     const result = await res.json();
-    if (result.status === 'success') {
-      toast('✓ บันทึกลง Cloud สำเร็จ!', 'ok');
-      const idx = photos.findIndex(img => img.id === p.id);
-      if(idx !== -1) {
-        photos[idx].uploaded = true;
-        if(document.getElementById('pg-photos').classList.contains('active')) renderPhotos();
-      }
+    if(result.status==='success'){
+      toast('✓ บันทึก Cloud สำเร็จ!','ok');
+      const idx = photos.findIndex(img=>img.id===p.id);
+      if(idx !== -1){ photos[idx].uploaded = true; if(document.getElementById('pg-photos').classList.contains('active')) renderPhotos(); }
     }
-  } catch (err) {
-    console.error('Auto upload failed:', err);
-    toast('❌ ซิงค์ข้อมูลล้มเหลว', 'bad');
-  }
+  } catch(err){ console.error(err); toast('❌ ซิงค์ล้มเหลว','bad'); }
 }
 
-async function syncAllUnuploaded() {
-  const unuploaded = photos.filter(p => !p.uploaded);
-  if(unuploaded.length === 0) {
-    toast('รูปทั้งหมดถูกอัปโหลดขึ้น Cloud แล้ว ✅', 'ok');
-    return;
-  }
-  if(!navigator.onLine) {
-    toast('กรุณาเชื่อมต่ออินเทอร์เน็ตก่อน 📴', 'bad');
-    return;
-  }
-  
-  if(!confirm(`มีรูปที่ยังไม่ได้อัปโหลด ${unuploaded.length} รูป ต้องการส่งตอนนี้หรือไม่?`)) return;
-
-  toast(`กำลังทยอยส่งทีละรูป (${unuploaded.length} รูป)...`);
-  for(let i=0; i<unuploaded.length; i++) {
-    const p = unuploaded[i];
-    const d = new Date(p.dt);
-    const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
-
-    const payload = { 
-      action: 'uploadPhoto',
-      id: p.id, dataURL: p.dataURL, filename: fname, 
-      lat: p.lat || '', lng: p.lng || '', alt: p.alt || '', acc: p.acc || '', dt: p.dt, project: p.project || '' 
-    };
-
+async function syncAllUnuploaded(){
+  const unuploaded = photos.filter(p=>!p.uploaded);
+  if(!unuploaded.length){ toast('รูปทั้งหมดอัปโหลดแล้ว ✅','ok'); return; }
+  if(!navigator.onLine){ toast('กรุณาเชื่อมต่ออินเทอร์เน็ตก่อน 📴','bad'); return; }
+  if(!confirm(`มีรูปที่ยังไม่ได้อัปโหลด ${unuploaded.length} รูป ต้องการส่งตอนนี้?`)) return;
+  toast(`กำลังส่ง ${unuploaded.length} รูป...`);
+  for(let i=0; i<unuploaded.length; i++){
+    const p=unuploaded[i];
+    const d=new Date(p.dt);
+    const fname=`survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
+    const payload={action:'uploadPhoto', id:p.id, dataURL:p.dataURL, filename:fname, lat:p.lat||'', lng:p.lng||'', alt:p.alt||'', acc:p.acc||'', dt:p.dt, project:p.project||''};
     try {
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }});
-      const result = await res.json();
-      if(result.status === 'success') {
-        const idx = photos.findIndex(img => img.id === p.id);
-        if(idx !== -1) photos[idx].uploaded = true;
-        renderPhotos(); 
+      const res=await fetch(GAS_URL, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}});
+      const result=await res.json();
+      if(result.status==='success'){
+        const idx=photos.findIndex(img=>img.id===p.id);
+        if(idx !== -1) photos[idx].uploaded=true;
+        renderPhotos();
       }
-    } catch(err) {
-      toast(`อัปโหลดล้มเหลวที่รูป ${i+1}`, 'bad');
-      break; 
-    }
+    } catch(err){ toast(`อัปโหลดล้มเหลวที่รูป ${i+1}`,'bad'); break; }
   }
-  toast('ดำเนินการ Sync เสร็จสิ้น', 'ok');
+  updCnt();
+  toast('Sync เสร็จสิ้น','ok');
 }
 
 /* ================================================================
    PHOTOS LIST
 ================================================================ */
-function getDriveImgUrl(url) {
-  // แปลง drive.google.com/uc?export=view&id=FILE_ID
-  // เป็น drive.google.com/thumbnail?id=FILE_ID&sz=w400
-  // เพื่อหลีกเลี่ยง CORS และ redirect ที่ทำให้ <img> โหลดไม่ได้
-  if (!url) return url;
+function getDriveImgUrl(url){
+  if(!url) return url;
   try {
     const m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
-  } catch(e) {}
+    if(m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+  } catch(e){}
   return url;
 }
-
 function renderPhotos(){
-  const g=document.getElementById('pgrid');
-  if(!photos.length){g.innerHTML='<div class="emp">📷<br><br>ยังไม่มีรูปภาพ หรือยังไม่ได้ซิงค์จาก Cloud<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';return;}
-  g.innerHTML=photos.map((p,i)=>{
-    const d=new Date(p.dt);
-    const syncBadge = `<div class="p-sync ${p.uploaded ? 'ok' : ''}">${p.uploaded ? '✅' : '☁️'}</div>`;
-    const imgSrc = p.uploaded && p.dataURL && p.dataURL.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
-    return `<div class="pc" onclick="openV(${i})">
+  const g = document.getElementById('pgrid');
+  updCnt();
+  if(!photos.length){
+    g.innerHTML = '<div class="emp"><span class="emp-icon">📷</span>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';
+    return;
+  }
+  g.innerHTML = photos.map((p,i)=>{
+    const d = new Date(p.dt);
+    const syncBadge = `<div class="p-sync ${p.uploaded?'ok':''}">${p.uploaded?'☁':'⏳'}</div>`;
+    const imgSrc = p.uploaded && p.dataURL?.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
+    const projTag = p.project ? `<div class="ppj">${p.project}</div>` : '';
+    return `<div class="pc" style="animation-delay:${Math.min(i,10)*0.04}s" onclick="openV(${i})">
       ${syncBadge}
       <img src="${imgSrc}" loading="lazy" alt=""
-        onerror="this.onerror=null;this.src='${imgSrc.replace(/'/g,"\\'")}';this.style.opacity='0.4';this.title='โหลดรูปไม่ได้'">
+        onerror="this.onerror=null;this.style.opacity='0.3'">
       <div class="pm">
-        <div class="pdt">${fD(d)} ${fT(d)}${p.project?' · '+p.project:''}</div>
-        <div class="pco">${p.lat?p.lat.toFixed(5)+', '+p.lng.toFixed(5):'ไม่มี GPS'}</div>
-      </div></div>`;
+        <div class="pdt">${fD(d)} ${fT(d)}</div>
+        <div class="pco">${p.lat ? p.lat.toFixed(5)+', '+p.lng.toFixed(5) : 'ไม่มี GPS'}</div>
+        ${projTag}
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -1238,315 +1749,242 @@ function renderPhotos(){
    VIEWER
 ================================================================ */
 function openV(i){
-  vIdx=i; const p=photos[i]; const d=new Date(p.dt);
-  const vimgSrc = p.uploaded && p.dataURL && p.dataURL.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
-  document.getElementById('vimg').src=vimgSrc;
-  document.getElementById('vtit').textContent=`ภาพ ${i+1}/${photos.length}`;
-  document.getElementById('vilat').textContent=p.lat?p.lat.toFixed(7)+'°':'ไม่มีข้อมูล';
-  document.getElementById('vilng').textContent=p.lng?p.lng.toFixed(7)+'°':'ไม่มีข้อมูล';
-  document.getElementById('vialt').textContent=p.alt?p.alt.toFixed(1)+' m':'--';
-  document.getElementById('viacc').textContent=p.acc?'±'+Math.round(p.acc)+' m':'--';
-  document.getElementById('vitm').textContent=fT(d);
-  document.getElementById('vidt').textContent=fD(d);
-  document.getElementById('viproj').textContent=p.project||'-';
-  
-  const btn = document.getElementById('btn-upcloud');
-  if (p.uploaded) {
-    btn.textContent = '✅ อัปโหลดแล้ว';
-    btn.disabled = true;
-    btn.style.pointerEvents = 'none';
-  } else {
-    btn.textContent = '☁️ อัปโหลดขึ้น Cloud';
-    btn.disabled = false;
-    btn.style.pointerEvents = 'auto';
-  }
-  
+  vIdx = i;
+  _loadViewer(i);
   goPg('viewer');
 }
+function _loadViewer(i){
+  const p = photos[i];
+  if(!p) return;
+  const d = new Date(p.dt);
+  const src = p.uploaded && p.dataURL?.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
+  document.getElementById('vimg').src = src;
+  document.getElementById('vtit').textContent = `ภาพ ${i+1}/${photos.length}`;
+  document.getElementById('vilat').textContent = p.lat ? p.lat.toFixed(7)+'°' : 'ไม่มีข้อมูล';
+  document.getElementById('vilng').textContent = p.lng ? p.lng.toFixed(7)+'°' : 'ไม่มีข้อมูล';
+  document.getElementById('vialt').textContent = p.alt ? p.alt.toFixed(1)+' m' : '--';
+  document.getElementById('viacc').textContent = p.acc ? '±'+Math.round(p.acc)+' m' : '--';
+  document.getElementById('vitm').textContent  = fT(d);
+  document.getElementById('vidt').textContent  = fD(d);
+  document.getElementById('viproj').textContent = p.project || '-';
+  const btn = document.getElementById('btn-upcloud');
+  if(p.uploaded){ btn.textContent='✅ อัปโหลดแล้ว'; btn.disabled=true; }
+  else { btn.textContent='☁️ อัปโหลด'; btn.disabled=false; }
+  document.getElementById('v-prev').disabled = i <= 0;
+  document.getElementById('v-next').disabled = i >= photos.length-1;
+}
+function navViewer(dir){
+  const ni = vIdx + dir;
+  if(ni < 0 || ni >= photos.length) return;
+  vIdx = ni;
+  _loadViewer(ni);
+}
+// swipe to navigate in viewer
+let _vt0=null, _vx0=null;
+document.getElementById('vwrap')?.addEventListener('touchstart',e=>{
+  if(e.touches.length===1){ _vt0=Date.now(); _vx0=e.touches[0].clientX; }
+},{passive:true});
+document.getElementById('vwrap')?.addEventListener('touchend',e=>{
+  if(_vx0===null) return;
+  const dx = e.changedTouches[0].clientX - _vx0;
+  const dt = Date.now() - _vt0;
+  if(Math.abs(dx) > 50 && dt < 400) navViewer(dx < 0 ? 1 : -1);
+  _vx0 = null;
+},{passive:true});
 
 function saveGal(){
-  if(vIdx<0)return;
-  const p=photos[vIdx],d=new Date(p.dt);
+  if(vIdx<0) return;
+  const p=photos[vIdx], d=new Date(p.dt);
   const n=`survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
-  const a=document.createElement('a');a.href=p.dataURL;a.download=n;a.click();
+  const a=document.createElement('a'); a.href=p.dataURL; a.download=n; a.click();
   toast('บันทึก '+n,'ok');
 }
-
 function showQR(){
-  if(vIdx<0)return;
+  if(vIdx<0) return;
   const p=photos[vIdx];
-  if(!p.lat){toast('รูปนี้ไม่มี GPS','bad');return;}
+  if(!p.lat){ toast('รูปนี้ไม่มี GPS','bad'); return; }
   const url=`https://maps.google.com/?q=${p.lat},${p.lng}`;
   const canvas=document.getElementById('qr-canvas');
-
   const ctx=canvas.getContext('2d');
   const sz=220; canvas.width=sz; canvas.height=sz;
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,sz,sz);
-  ctx.fillStyle='#000';
-
-  const cell=8;
-  const modules=Math.floor(sz/cell);
-  for(let y=0;y<modules;y++){
-    for(let x=0;x<modules;x++){
-      const hash=(url.charCodeAt((x+y*modules)%url.length)*137+x*31+y*17)%100;
-      if(hash<45||(x<7&&y<7)||(x>modules-8&&y<7)||(x<7&&y>modules-8)){
-        if(!((x===1||x===5)&&y<7)&&!((y===1||y===5)&&x<7)&&!(x>=2&&x<=4&&y>=2&&y<=4)&&
-           !((x===modules-7||x===modules-3)&&y<7)&&!((y===1||y===5)&&x>modules-8)){
-          ctx.fillRect(x*cell,y*cell,cell,cell);
-        }
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,sz,sz); ctx.fillStyle='#000';
+  const cell=8, modules=Math.floor(sz/cell);
+  for(let y=0;y<modules;y++)for(let x=0;x<modules;x++){
+    const hash=(url.charCodeAt((x+y*modules)%url.length)*137+x*31+y*17)%100;
+    if(hash<45||(x<7&&y<7)||(x>modules-8&&y<7)||(x<7&&y>modules-8)){
+      if(!((x===1||x===5)&&y<7)&&!((y===1||y===5)&&x<7)&&!(x>=2&&x<=4&&y>=2&&y<=4)&&
+         !((x===modules-7||x===modules-3)&&y<7)&&!((y===1||y===5)&&x>modules-8)){
+        ctx.fillRect(x*cell,y*cell,cell,cell);
       }
     }
   }
-  [0,modules-7].forEach(ox=>{[0].forEach(oy=>{
-    ctx.strokeStyle='#000';ctx.lineWidth=cell;
-    ctx.strokeRect(ox*cell+cell/2,oy*cell+cell/2,6*cell,6*cell);
-  });});
-
   const d=new Date(p.dt);
-  document.getElementById('qr-info').innerHTML=
-    `ภาพที่ ${vIdx+1} · ${fD(d)}<br>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}<br><small style="color:#3b82f6">${url}</small>`;
+  document.getElementById('qr-info').innerHTML=`ภาพที่ ${vIdx+1} · ${fD(d)}<br>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
   document.getElementById('qr-modal').classList.add('show');
 }
-
 function openGM(){
-  if(vIdx<0)return;
+  if(vIdx<0) return;
   const p=photos[vIdx];
-  if(!p.lat){toast('รูปนี้ไม่มี GPS','bad');return;}
+  if(!p.lat){ toast('รูปนี้ไม่มี GPS','bad'); return; }
   window.open(`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`,'_blank');
 }
-
 async function shareP(){
-  if(vIdx<0)return;
+  if(vIdx<0) return;
   const p=photos[vIdx];
-  if(navigator.share&&navigator.canShare){
-    try{const res=await fetch(p.dataURL);const blob=await res.blob();const file=new File([blob],'survey.jpg',{type:'image/jpeg'});
-      if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'SurveyCAM Pro'});return;}}catch(e){}
+  if(navigator.share && navigator.canShare){
+    try{
+      const res=await fetch(p.dataURL); const blob=await res.blob();
+      const file=new File([blob],'survey.jpg',{type:'image/jpeg'});
+      if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'SurveyCAM'}); return;}
+    }catch(e){}
   }
   saveGal();
 }
-
-function extractDriveFileId(url) {
+function extractDriveFileId(url){
   if(!url || !url.includes('drive.google.com')) return null;
-  // รองรับทั้ง: uc?export=view&id=XXX  และ  thumbnail?id=XXX  และ  /d/XXX/
-  const m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/) || url.match(/\/d\/([a-zA-Z0-9_-]{10,})\//);
-  return m ? m[1] : null;
+  const m=url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/)||url.match(/\/d\/([a-zA-Z0-9_-]{10,})\//);
+  return m?m[1]:null;
 }
-
 function delP(){
-  if(vIdx<0)return;
-  if(!confirm('ลบรูปนี้? ระบบจะลบทั้งข้อมูลใน Sheet และไฟล์รูปใน Drive'))return;
-  
-  const photo = photos[vIdx];
-  const pId = photo.id;
-  // dataURL ที่เก็บใน photos[] มาจาก Sheet คือ uc?export=view&id=XXX
-  // แต่ถ้า photo ยังไม่ได้ upload (base64) driveFileId จะเป็น null → OK
-  const driveFileId = extractDriveFileId(photo.dataURL);
-  console.log('[delP] id='+pId+' driveFileId='+driveFileId+' url='+photo.dataURL?.substring(0,80));
-
-  photos.splice(vIdx,1); 
-  updCnt(); 
-  goBack(); 
+  if(vIdx<0) return;
+  if(!confirm('ลบรูปนี้? จะลบทั้ง Sheet และไฟล์ใน Drive')) return;
+  const photo=photos[vIdx];
+  const pId=photo.id;
+  const driveFileId=extractDriveFileId(photo.dataURL);
+  photos.splice(vIdx,1);
+  updCnt(); goBack();
   toast('กำลังลบจาก Cloud...');
-
-  if(navigator.onLine) {
-    fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'deletePhoto', id: pId, driveFileId: driveFileId }),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    })
-    .then(r=>r.json())
-    .then(res=>{
-      console.log('[delP] response:', res);
-      if(res.status==='success'){
-        toast('✓ ลบสำเร็จ'+(driveFileId?' (Sheet + Drive)':' (Sheet)'),'ok');
-      } else {
-        toast('ลบล้มเหลว: '+(res.message||'unknown'),'bad');
-      }
-    })
-    .catch(err=>{
-      console.error('[delP] error:',err);
-      toast('ลบออกจาก memory แล้ว (Cloud error)');
-    });
-  } else {
-    toast('ลบออกจากหน่วยความจำแล้ว (offline)');
-  }
+  if(navigator.onLine){
+    fetch(GAS_URL,{method:'POST',body:JSON.stringify({action:'deletePhoto',id:pId,driveFileId}),headers:{'Content-Type':'text/plain;charset=utf-8'}})
+      .then(r=>r.json())
+      .then(res=>{ if(res.status==='success') toast('✓ ลบสำเร็จ','ok'); else toast('ลบล้มเหลว','bad'); })
+      .catch(()=>toast('ลบออกจาก memory แล้ว'));
+  } else { toast('ลบออกจากหน่วยความจำแล้ว (offline)'); }
 }
-
 function clearAll(){
-  if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป? ระบบจะลบทั้ง Sheet และไฟล์รูปใน Drive`))return;
-  const driveFileIds = photos.map(p => extractDriveFileId(p.dataURL)).filter(Boolean);
-
-  photos=[]; 
-  updCnt(); 
-  toast('กำลังลบจาก Cloud...');
-
-  if(navigator.onLine) {
-    fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'deleteAllPhotos', driveFileIds: driveFileIds }),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    }).then(r=>r.json()).then(res=>{
-      if(res.status==='success') toast('\u2713 ลบทั้งหมดสำเร็จ (Sheet + Drive)','ok');
-      else toast('ล้าง Sheet แล้ว แต่ Drive อาจมีปัญหา','bad');
-    }).catch(()=>toast('ล้างข้อมูลแล้ว'));
+  if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป?`)) return;
+  const driveFileIds=photos.map(p=>extractDriveFileId(p.dataURL)).filter(Boolean);
+  photos=[]; updCnt(); toast('กำลังลบจาก Cloud...');
+  if(navigator.onLine){
+    fetch(GAS_URL,{method:'POST',body:JSON.stringify({action:'deleteAllPhotos',driveFileIds}),headers:{'Content-Type':'text/plain;charset=utf-8'}})
+      .then(r=>r.json())
+      .then(res=>{ if(res.status==='success') toast('✓ ลบทั้งหมดสำเร็จ','ok'); else toast('ล้าง Sheet แล้ว แต่ Drive อาจมีปัญหา','bad'); })
+      .catch(()=>toast('ล้างข้อมูลแล้ว'));
   }
 }
 
 /* ================================================================
-   MANUAL CLOUD UPLOAD
+   MANUAL UPLOAD
 ================================================================ */
-async function uploadToCloud() {
-  if (vIdx < 0) return;
-  const p = photos[vIdx];
-  const btn = document.getElementById('btn-upcloud');
-  
-  const d = new Date(p.dt);
-  const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
-
-  const payload = {
-    action: 'uploadPhoto',
-    id: p.id, dataURL: p.dataURL, filename: fname,
-    lat: p.lat || '', lng: p.lng || '', alt: p.alt || '', acc: p.acc || '',
-    dt: p.dt, project: p.project || ''
-  };
-
-  try {
-    toast('กำลังอัปโหลด... อาจใช้เวลาสักครู่');
-    btn.textContent = '⏳ กำลังอัปโหลด...';
-    btn.style.pointerEvents = 'none';
-
-    const res = await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    });
-
-    const result = await res.json();
-    
-    if (result.status === 'success') {
-      toast('✓ อัปโหลดขึ้น Cloud สำเร็จ!', 'ok');
-      btn.textContent = '✅ อัปโหลดแล้ว';
-      photos[vIdx].uploaded = true;
+async function uploadToCloud(){
+  if(vIdx < 0) return;
+  const p=photos[vIdx];
+  const btn=document.getElementById('btn-upcloud');
+  const d=new Date(p.dt);
+  const fname=`survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
+  const payload={action:'uploadPhoto',id:p.id,dataURL:p.dataURL,filename:fname,lat:p.lat||'',lng:p.lng||'',alt:p.alt||'',acc:p.acc||'',dt:p.dt,project:p.project||''};
+  try{
+    toast('กำลังอัปโหลด...');
+    btn.textContent='⏳...'; btn.disabled=true;
+    const res=await fetch(GAS_URL,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain;charset=utf-8'}});
+    const result=await res.json();
+    if(result.status==='success'){
+      toast('✓ อัปโหลดสำเร็จ!','ok');
+      btn.textContent='✅ อัปโหลดแล้ว';
+      photos[vIdx].uploaded=true;
     } else {
-      toast('❌ อัปโหลดล้มเหลว: ' + result.message, 'bad');
-      btn.textContent = '☁️ ลองใหม่';
-      btn.style.pointerEvents = 'auto';
+      toast('❌ อัปโหลดล้มเหลว','bad');
+      btn.textContent='☁️ ลองใหม่'; btn.disabled=false;
     }
-  } catch (err) {
+  } catch(err){
     console.error(err);
-    toast('❌ เชื่อมต่อล้มเหลว กรุณาลองใหม่เมื่อมีเน็ต', 'bad');
-    btn.textContent = '☁️ ลองใหม่';
-    btn.style.pointerEvents = 'auto';
+    toast('❌ เชื่อมต่อล้มเหลว','bad');
+    btn.textContent='☁️ ลองใหม่'; btn.disabled=false;
   }
 }
 
 /* ================================================================
-   PDF REPORT & CSV
+   PDF / CSV EXPORT
 ================================================================ */
 async function genPDF(){
-  if(!photos.length){toast('ยังไม่มีรูปภาพในหน่วยความจำ','bad');return;}
+  if(!photos.length){ toast('ยังไม่มีรูปภาพ','bad'); return; }
   const modal=document.getElementById('pdf-modal');
   const status=document.getElementById('pdf-status');
   const fill=document.getElementById('pdf-prog-fill');
   modal.classList.add('show');
-
-  const setP=(pct,txt)=>{fill.style.width=pct+'%';status.textContent=txt;};
-
+  const setP=(pct,txt)=>{ fill.style.width=pct+'%'; status.textContent=txt; };
   setP(5,'เตรียมข้อมูล...');
   await new Promise(r=>setTimeout(r,100));
-
-  const proj=cfg.project||'SurveyCAM Pro';
+  const proj=cfg.project||'SurveyCAM';
   const now=new Date();
-
   let rows='';
   photos.forEach((p,i)=>{
     const d=new Date(p.dt);
     const gmUrl=p.lat?`https://maps.google.com/?q=${p.lat},${p.lng}`:'';
     rows+=`<tr>
       <td>${i+1}</td>
-      <td><img src="${p.uploaded&&p.dataURL&&p.dataURL.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;"></td>
+      <td><img src="${p.uploaded&&p.dataURL?.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL}" style="width:110px;height:82px;object-fit:cover;border-radius:4px;"></td>
       <td>${p.lat?p.lat.toFixed(6)+'\n'+p.lng.toFixed(6):'ไม่มี GPS'}</td>
       <td>${p.alt?p.alt.toFixed(1)+' m':'--'}</td>
       <td>±${p.acc?Math.round(p.acc):'-'} m</td>
       <td>${fD(d)}<br>${fT(d)}</td>
       <td>${p.project||'-'}</td>
-      ${gmUrl?`<td><a href="${gmUrl}">🗺 Maps</a></td>`:'<td>-</td>'}
+      ${gmUrl?`<td><a href="${gmUrl}">🗺</a></td>`:'<td>-</td>'}
     </tr>`;
-    setP(10+Math.round((i/photos.length)*60),'สร้างตาราง '+( i+1)+'/'+photos.length+'...');
+    setP(10+Math.round((i/photos.length)*60),'สร้างตาราง '+(i+1)+'/'+photos.length+'...');
   });
-
   setP(72,'สร้างแผนที่...');
   await new Promise(r=>setTimeout(r,80));
-
-  const ptsJS=photos.filter(p=>p.lat).map((p,i)=>`[${p.lat},${p.lng}]`).join(',');
-
+  const ptsJS=photos.filter(p=>p.lat).map(p=>`[${p.lat},${p.lng}]`).join(',');
   const html=`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
-  <title>รายงานสำรวจ ${proj}</title>
-  <style>
-    body{font-family:'Courier New',monospace;background:#f8fafc;color:#1e293b;margin:0;padding:20px;}
-    .header{background:#080c12;color:#00e5b0;padding:20px 24px;border-radius:12px;margin-bottom:20px;}
-    .header h1{font-size:20px;margin:0;letter-spacing:.2em;}
-    .header .sub{font-size:11px;color:#64748b;margin-top:6px;}
-    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
-    .stat{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;text-align:center;}
-    .stat .n{font-size:24px;font-weight:700;color:#00e5b0;}
-    .stat .l{font-size:10px;color:#64748b;margin-top:4px;}
-    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);}
-    th{background:#080c12;color:#00e5b0;padding:10px 8px;font-size:10px;letter-spacing:.1em;text-align:left;}
-    td{padding:8px;border-bottom:1px solid #f1f5f9;font-size:11px;vertical-align:middle;}
-    tr:last-child td{border-bottom:none;}
-    a{color:#3b82f6;}
-    .map-wrap{height:300px;border-radius:10px;overflow:hidden;margin:20px 0;border:1px solid #e2e8f0;}
-    @media print{body{padding:0;}.header{border-radius:0;}}
-  </style>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  </head><body>
-  <div class="header">
-    <h1>📊 รายงานสำรวจ</h1>
-    <div class="sub">โครงการ: ${proj} · วันที่ออกรายงาน: ${fD(now)} ${fT(now)}</div>
-  </div>
-  <div class="stats">
-    <div class="stat"><div class="n">${photos.length}</div><div class="l">จุดสำรวจ</div></div>
-    <div class="stat"><div class="n">${photos.filter(p=>p.lat).length}</div><div class="l">มีพิกัด GPS</div></div>
-    <div class="stat"><div class="n">${photos.filter(p=>p.acc&&p.acc<=15).length}</div><div class="l">GPS แม่น ≤15m</div></div>
-    <div class="stat"><div class="n">${photos.length>0?Math.round(photos.filter(p=>p.acc).reduce((a,p)=>a+p.acc,0)/Math.max(1,photos.filter(p=>p.acc).length)):'-'}</div><div class="l">ค่าเฉลี่ย ACC (m)</div></div>
-  </div>
-  <div class="map-wrap" id="rmap"></div>
-  <table>
-    <thead><tr><th>#</th><th>รูปภาพ</th><th>พิกัด (LAT/LNG)</th><th>ความสูง</th><th>ความแม่น</th><th>วันเวลา</th><th>โครงการ</th><th>Maps</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
-  <script>
-    const pts=[${ptsJS}];
-    if(pts.length){
-      const m=L.map('rmap').setView(pts[0],14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-      pts.forEach((p,i)=>{
-        L.marker(p).addTo(m).bindTooltip(''+(i+1));
-      });
-      if(pts.length>1) L.polyline(pts,{color:'#00e5b0',weight:2,dashArray:'4 6'}).addTo(m);
-      if(pts.length>1){const b=L.latLngBounds(pts);m.fitBounds(b,{padding:[20,20]});}
-    }
-  <\/script>
-  </body></html>`;
-
+<title>รายงานสำรวจ ${proj}</title>
+<style>
+body{font-family:'Courier New',monospace;background:#f8fafc;color:#1e293b;margin:0;padding:20px;}
+.header{background:#060a10;color:#00dba4;padding:20px 24px;border-radius:12px;margin-bottom:20px;}
+.header h1{font-size:20px;margin:0;letter-spacing:.15em;}
+.header .sub{font-size:11px;color:#64748b;margin-top:6px;}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;text-align:center;}
+.stat .n{font-size:24px;font-weight:700;color:#00dba4;}.stat .l{font-size:10px;color:#64748b;margin-top:4px;}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+th{background:#060a10;color:#00dba4;padding:10px 8px;font-size:10px;letter-spacing:.1em;text-align:left;}
+td{padding:8px;border-bottom:1px solid #f1f5f9;font-size:11px;vertical-align:middle;}tr:last-child td{border-bottom:none;}
+a{color:#3b82f6;}.map-wrap{height:300px;border-radius:10px;overflow:hidden;margin:20px 0;border:1px solid #e2e8f0;}
+@media print{body{padding:0;}.header{border-radius:0;}}
+</style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head><body>
+<div class="header"><h1>📊 รายงานสำรวจ</h1><div class="sub">โครงการ: ${proj} · ${fD(now)} ${fT(now)}</div></div>
+<div class="stats">
+<div class="stat"><div class="n">${photos.length}</div><div class="l">จุดสำรวจ</div></div>
+<div class="stat"><div class="n">${photos.filter(p=>p.lat).length}</div><div class="l">มีพิกัด GPS</div></div>
+<div class="stat"><div class="n">${photos.filter(p=>p.acc&&p.acc<=15).length}</div><div class="l">GPS แม่น ≤15m</div></div>
+<div class="stat"><div class="n">${photos.length>0?Math.round(photos.filter(p=>p.acc).reduce((a,p)=>a+p.acc,0)/Math.max(1,photos.filter(p=>p.acc).length)):'-'}</div><div class="l">เฉลี่ย ACC (m)</div></div>
+</div>
+<div class="map-wrap" id="rmap"></div>
+<table><thead><tr><th>#</th><th>รูปภาพ</th><th>พิกัด</th><th>ความสูง</th><th>แม่นยำ</th><th>วันเวลา</th><th>โครงการ</th><th>Maps</th></tr></thead>
+<tbody>${rows}</tbody></table>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<script>
+const pts=[${ptsJS}];
+if(pts.length){
+  const m=L.map('rmap').setView(pts[0],14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+  pts.forEach((p,i)=>{L.marker(p).addTo(m).bindTooltip(''+(i+1));});
+  if(pts.length>1){L.polyline(pts,{color:'#00dba4',weight:2,dashArray:'4 6'}).addTo(m);const b=L.latLngBounds(pts);m.fitBounds(b,{padding:[20,20]});}
+}
+<\/script></body></html>`;
   setP(90,'บันทึกไฟล์...');
   await new Promise(r=>setTimeout(r,100));
-
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`surveycam_report_${now.getFullYear()}${p2(now.getMonth()+1)}${p2(now.getDate())}.html`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-
+  a.click(); URL.revokeObjectURL(a.href);
   setP(100,'เสร็จแล้ว!');
-  setTimeout(()=>{ modal.classList.remove('show'); toast('📊 PDF Report พร้อมแล้ว!','ok'); },800);
+  setTimeout(()=>{ modal.classList.remove('show'); toast('📊 รายงานพร้อมแล้ว!','ok'); },800);
 }
-
 function doCSV(){
-  if(!photos.length){toast('ยังไม่มีรูปภาพ','bad');return;}
+  if(!photos.length){ toast('ยังไม่มีรูปภาพ','bad'); return; }
   const rows=[['no','project','datetime_iso','date_th','time','lat','lng','altitude_m','accuracy_m','google_maps_url']];
   photos.forEach((p,i)=>{
     const d=new Date(p.dt);
@@ -1555,236 +1993,140 @@ function doCSV(){
   });
   const csv=rows.map(r=>r.join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`surveycam_${Date.now()}.csv`;a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`surveycam_${Date.now()}.csv`; a.click();
   toast(`ส่งออก ${photos.length} รายการ`,'ok');
 }
 
 /* ================================================================
    MAP
 ================================================================ */
-// ── MAP POPUP STATE ──────────────────────────────────────────────
-let _popupGroups = {};   // markerID → group array
-let _popupIdxMap = {};   // markerID → current index
-
-// สีแต่ละโครงการ (cyclic palette)
-const PROJ_COLORS = ['#00e5b0','#60a5fa','#f59e0b','#a78bfa','#f472b6','#34d399','#fb923c'];
-let _projColorMap = {};
+let _popupGroups={}, _popupIdxMap={};
+const PROJ_COLORS=['#00dba4','#4f9cf9','#f5a623','#a78bfa','#f472b6','#34d399','#fb923c'];
+let _projColorMap={};
 function getProjColor(proj){
-  if(!proj) return '#00e5b0';
-  if(!_projColorMap[proj]){
-    const keys = Object.keys(_projColorMap);
-    _projColorMap[proj] = PROJ_COLORS[keys.length % PROJ_COLORS.length];
-  }
+  if(!proj) return '#00dba4';
+  if(!_projColorMap[proj]){ const k=Object.keys(_projColorMap); _projColorMap[proj]=PROJ_COLORS[k.length%PROJ_COLORS.length]; }
   return _projColorMap[proj];
 }
+function getImgSrc(p){ return p.uploaded&&p.dataURL?.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL; }
 
-function getImgSrc(p) {
-  return p.uploaded && p.dataURL && p.dataURL.startsWith('http')
-    ? getDriveImgUrl(p.dataURL) : p.dataURL;
-}
-
-function renderPopupInto(el, group, idx) {
-  const item = group[idx];
-  const p = item.p;
-  const d = new Date(p.dt);
-  const count = group.length;
-  const imgSrc = getImgSrc(p);
-
-  const projColor = getProjColor(p.project);
-  let html = '';
-  if(count > 1) {
-    html += `<div class="pop-multi-header" style="background:${projColor}20;border-color:${projColor}40;color:${projColor};">📍 ${count} ภาพ · ${idx+1}/${count}</div>`;
-  }
-  html += `<img class="pop-img" src="${imgSrc}" onerror="this.style.opacity=0.3">`;
-  html += `<div class="pop-wrap">`;
-  html += `<div class="pop-badge">
-    <span class="pop-num">📷 #${item.originalIndex}</span>
-    <span class="pop-sync">${p.uploaded ? '✅' : '☁️'}</span>
+function renderPopupInto(el, group, idx){
+  const item=group[idx], p=item.p, d=new Date(p.dt), count=group.length, imgSrc=getImgSrc(p), projColor=getProjColor(p.project);
+  let html='';
+  if(count>1) html+=`<div class="pop-multi-header" style="background:${projColor}15;border-color:${projColor}30;color:${projColor};">📍 ${count} ภาพ · ${idx+1}/${count}</div>`;
+  html+=`<img class="pop-img" src="${imgSrc}" onerror="this.style.opacity=0.3">`;
+  html+=`<div class="pop-wrap">`;
+  html+=`<div class="pop-badge"><span class="pop-num">📷 #${item.originalIndex}</span><span class="pop-sync">${p.uploaded?'☁':'⏳'}</span></div>`;
+  html+=`<div class="pop-row">🕐 <b>${fD(d)} ${fT(d)}</b></div>`;
+  if(p.lat) html+=`<div class="pop-row">📍 <b>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</b></div>`;
+  if(p.acc) html+=`<div class="pop-row">🎯 ±<b>${Math.round(p.acc)} m</b></div>`;
+  if(p.alt) html+=`<div class="pop-row">⬆️ <b>${p.alt.toFixed(1)} m</b></div>`;
+  if(p.project?.trim()) html+=`<div class="pop-row">🏗 <b>${p.project}</b></div>`;
+  if(p.lat) html+=`<hr class="pop-divider"><a class="pop-btn" href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank">🗺 เปิด Google Maps</a>`;
+  if(count>1) html+=`<div class="pop-nav">
+    <button class="pop-nav-btn" data-dir="-1" ${idx===0?'disabled':''}>◀ ก่อนหน้า</button>
+    <button class="pop-nav-btn" data-dir="1" ${idx===count-1?'disabled':''}>ถัดไป ▶</button>
   </div>`;
-  html += `<div class="pop-row">🕐 <b>${fD(d)} ${fT(d)}</b></div>`;
-  if(p.lat) html += `<div class="pop-row">📍 <b>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</b></div>`;
-  if(p.acc) html += `<div class="pop-row">🎯 ±<b>${Math.round(p.acc)} m</b></div>`;
-  if(p.alt) html += `<div class="pop-row">⬆️ <b>${p.alt.toFixed(1)} m</b></div>`;
-  if(p.project && p.project.trim()) html += `<div class="pop-row">🏗 <b>${p.project}</b></div>`;
-  if(p.lat) html += `<hr class="pop-divider"><a class="pop-btn" href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank">🗺 เปิด Google Maps</a>`;
-
-  if(count > 1) {
-    html += `<div class="pop-nav">
-      <button class="pop-nav-btn" data-dir="-1" ${idx===0?'disabled':''}>${idx===0?'<span style="opacity:.3">◀</span>':'◀'} ก่อนหน้า</button>
-      <button class="pop-nav-btn" data-dir="1" ${idx===count-1?'disabled':''}>${idx===count-1?'ถัดไป <span style="opacity:.3">▶</span>':'ถัดไป ▶'}</button>
-    </div>`;
-  }
-  html += `</div>`;
-
-  el.innerHTML = html;
-
-  // ผูก event โดยตรงกับ DOM element — ไม่ใช้ onclick string → popup ไม่ปิด
-  if(count > 1) {
-    el.querySelectorAll('.pop-nav-btn').forEach(btn => {
-      L.DomEvent.on(btn, 'click', function(e) {
-        L.DomEvent.stopPropagation(e);
-        L.DomEvent.preventDefault(e);
-        const dir = parseInt(this.dataset.dir);
-        const mid = el.dataset.mid;
-        const g = _popupGroups[mid];
-        let ni = (_popupIdxMap[mid] || 0) + dir;
-        ni = Math.max(0, Math.min(g.length-1, ni));
-        _popupIdxMap[mid] = ni;
-        renderPopupInto(el, g, ni);
-      }, btn);
-    });
-  }
+  html+=`</div>`;
+  el.innerHTML=html;
+  if(count>1) el.querySelectorAll('.pop-nav-btn').forEach(btn=>{
+    L.DomEvent.on(btn,'click',function(e){
+      L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
+      const dir=parseInt(this.dataset.dir), mid=el.dataset.mid, g=_popupGroups[mid];
+      let ni=(_popupIdxMap[mid]||0)+dir; ni=Math.max(0,Math.min(g.length-1,ni));
+      _popupIdxMap[mid]=ni; renderPopupInto(el,g,ni);
+    },btn);
+  });
 }
 
 function renderMapFilterBar(){
-  const bar = document.getElementById('map-filter-bar');
+  const bar=document.getElementById('map-filter-bar');
   if(!bar) return;
-  // เฉพาะรูปที่มี GPS + มีชื่อโครงการจริง
-  const allProjs = [...new Set(
-    photos.filter(p => p.lat && p.project && p.project.trim())
-          .map(p => p.project.trim())
-  )].sort();
-  const totalGps = photos.filter(p=>p.lat).length;
-  let html = `<span class="mf-chip${mapFilterProject==='all'?' active':''}" onclick="setMapFilter('all')">🗺 ทั้งหมด <b style="opacity:.7">${totalGps}</b></span>`;
-  allProjs.forEach(pj => {
-    const safe = pj.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    const cnt  = photos.filter(p => p.lat && p.project === pj).length;
-    html += `<span class="mf-chip${mapFilterProject===pj?' active':''}" onclick="setMapFilter('${safe}')">${pj} <b style="opacity:.7">${cnt}</b></span>`;
+  const allProjs=[...new Set(photos.filter(p=>p.lat&&p.project?.trim()).map(p=>p.project.trim()))].sort();
+  const totalGps=photos.filter(p=>p.lat).length;
+  let html=`<span class="mf-chip${mapFilterProject==='all'?' active':''}" onclick="setMapFilter('all')">ทั้งหมด <b>${totalGps}</b></span>`;
+  allProjs.forEach(pj=>{
+    const safe=pj.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const cnt=photos.filter(p=>p.lat&&p.project===pj).length;
+    html+=`<span class="mf-chip${mapFilterProject===pj?' active':''}" onclick="setMapFilter('${safe}')">${pj} <b>${cnt}</b></span>`;
   });
-  bar.innerHTML = html;
+  bar.innerHTML=html;
 }
-
-function setMapFilter(proj){
-  mapFilterProject = proj;
-  initMap();
-}
+function setMapFilter(proj){ mapFilterProject=proj; initMap(); }
 
 function initMap(){
   renderMapFilterBar();
-  const allPts = photos.filter(p => p.lat);
-  const pts = mapFilterProject==='all' ? allPts
-    : allPts.filter(p => (p.project||'') === mapFilterProject);
-  document.getElementById('mcount').textContent = pts.length;
-
-  if(lmap){lmap.remove();lmap=null;}
-  const ctr = pts.length ? [pts[0].lat, pts[0].lng] : gps ? [gps.lat, gps.lng] : [13.7563, 100.5018];
-  lmap = L.map('lmap', {zoomControl:false}).setView(ctr, 15);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    attribution:'© OSM © CARTO', maxZoom:19
-  }).addTo(lmap);
+  const allPts=photos.filter(p=>p.lat);
+  const pts=mapFilterProject==='all'?allPts:allPts.filter(p=>(p.project||'')===mapFilterProject);
+  document.getElementById('mcount').textContent=pts.length;
+  if(lmap){ lmap.remove(); lmap=null; }
+  const ctr=pts.length?[pts[0].lat,pts[0].lng]:gps?[gps.lat,gps.lng]:[13.7563,100.5018];
+  lmap=L.map('lmap',{zoomControl:false}).setView(ctr,15);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(lmap);
   L.control.zoom({position:'topright'}).addTo(lmap);
-
-  // Marker cluster group
-  const cluster = L.markerClusterGroup({
-    showCoverageOnHover: false,
-    maxClusterRadius: 50,
-    spiderfyOnMaxZoom: true,
-    iconCreateFunction: function(cl) {
-      const n = cl.getChildCount();
-      const col = mapFilterProject!=='all' ? getProjColor(mapFilterProject) : '#00e5b0';
-      return L.divIcon({
-        html: `<div style="background:${col};color:#000;width:40px;height:40px;border-radius:50%;
-          display:flex;align-items:center;justify-content:center;font-weight:700;
-          font-family:monospace;font-size:15px;border:3px solid #fff;
-          box-shadow:0 3px 16px ${col}88;">${n}</div>`,
-        className:'', iconSize:[40,40], iconAnchor:[20,20]
-      });
+  const cluster=L.markerClusterGroup({
+    showCoverageOnHover:false,maxClusterRadius:50,spiderfyOnMaxZoom:true,
+    iconCreateFunction:function(cl){
+      const n=cl.getChildCount(), col=mapFilterProject!=='all'?getProjColor(mapFilterProject):'#00dba4';
+      return L.divIcon({html:`<div style="background:${col};color:#000;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:monospace;font-size:14px;border:3px solid #fff;box-shadow:0 3px 16px ${col}88;">${n}</div>`,className:'',iconSize:[38,38],iconAnchor:[19,19]});
     }
   });
-
-  // ── จัดกลุ่มพิกัด: รูปทุกรูปมี marker ตัวเอง แต่รูปที่ GPS ซ้ำกัน (<3m) จะถูกรวม popup ──
-  // ใช้ distance จริงแทน toFixed เพื่อไม่ตกหล่น
-  const R = 6371000;
-  function dist(a, b) {
-    const dLat = (b[0]-a[0])*Math.PI/180;
-    const dLng = (b[1]-a[1])*Math.PI/180;
-    const s = Math.sin(dLat/2)**2 + Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLng/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
-  }
-
-  // กลุ่มพิกัด: รวมรูปที่อยู่ภายใน 5 เมตรจากกัน
-  // originalIndex = ลำดับตามเวลาจริง (เก่า→ใหม่) ไม่ใช่ index ของ filtered array
-  // photos เรียงใหม่→เก่า ดังนั้น originalIndex = photos.length - index_in_photos
-  const photoTimeOrder = [...photos].reverse(); // เก่า→ใหม่ = ลำดับ 1,2,3...
-  const groups = [];
-  pts.forEach((p) => {
-    const coord = [p.lat, p.lng];
-    // หา index ตามเวลา (1-based)
-    const timeIdx = photoTimeOrder.findIndex(x => x.id === p.id);
-    const seqNum = timeIdx >= 0 ? timeIdx + 1 : photos.length;
-    let found = groups.find(g => dist([g[0].p.lat, g[0].p.lng], coord) < 5);
-    if(found) found.push({ p, originalIndex: seqNum });
-    else groups.push([{ p, originalIndex: seqNum }]);
+  const R=6371000;
+  function dist(a,b){const dLat=(b[0]-a[0])*Math.PI/180,dLng=(b[1]-a[1])*Math.PI/180,s=Math.sin(dLat/2)**2+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));}
+  const photoTimeOrder=[...photos].reverse();
+  const groups=[];
+  pts.forEach(p=>{
+    const coord=[p.lat,p.lng];
+    const timeIdx=photoTimeOrder.findIndex(x=>x.id===p.id);
+    const seqNum=timeIdx>=0?timeIdx+1:photos.length;
+    let found=groups.find(g=>dist([g[0].p.lat,g[0].p.lng],coord)<5);
+    if(found) found.push({p,originalIndex:seqNum});
+    else groups.push([{p,originalIndex:seqNum}]);
   });
-  // เรียง group แต่ละกลุ่มตาม seqNum เก่า→ใหม่
-  groups.forEach(g => g.sort((a,b) => a.originalIndex - b.originalIndex));
-
-  groups.forEach((group, gi) => {
-    const firstP = group[0].p;
-    const count = group.length;
-    const mid = 'mk_' + gi;
-    _popupGroups[mid] = group;
-    _popupIdxMap[mid] = 0;
-
-    const pColor = getProjColor(firstP.project);
-    const icon = L.divIcon({
-      html: `<div class="survey-marker" style="background:${pColor};position:relative;">
+  groups.forEach(g=>g.sort((a,b)=>a.originalIndex-b.originalIndex));
+  groups.forEach((group,gi)=>{
+    const firstP=group[0].p,count=group.length,mid='mk_'+gi;
+    _popupGroups[mid]=group; _popupIdxMap[mid]=0;
+    const pColor=getProjColor(firstP.project);
+    const icon=L.divIcon({
+      html:`<div class="survey-marker" style="background:${pColor};">
         <span style="transform:rotate(45deg);font-size:9px;font-weight:700;">${group[0].originalIndex}</span>
         ${count>1?`<div style="position:absolute;top:-6px;right:-6px;background:#fff;color:#000;border-radius:50%;width:16px;height:16px;font-size:8px;display:flex;align-items:center;justify-content:center;border:2px solid ${pColor};font-weight:700;">${count}</div>`:''}
       </div>`,
-      className:'', iconSize:[30,30], iconAnchor:[15,30]
+      className:'',iconSize:[28,28],iconAnchor:[14,28]
     });
-
-    // สร้าง popup container จริง
-    const popEl = document.createElement('div');
-    popEl.dataset.mid = mid;
-    renderPopupInto(popEl, group, 0);
-
-    const popup = L.popup({maxWidth:240, minWidth:220, closeButton:true})
-      .setContent(popEl);
-
-    const marker = L.marker([firstP.lat, firstP.lng], {icon});
+    const popEl=document.createElement('div');
+    popEl.dataset.mid=mid;
+    renderPopupInto(popEl,group,0);
+    const popup=L.popup({maxWidth:240,minWidth:220,closeButton:true}).setContent(popEl);
+    const marker=L.marker([firstP.lat,firstP.lng],{icon});
     marker.bindPopup(popup);
-    marker.on('popupopen', () => {
-      _popupIdxMap[mid] = 0;
-      renderPopupInto(popEl, group, 0);
-    });
+    marker.on('popupopen',()=>{ _popupIdxMap[mid]=0; renderPopupInto(popEl,group,0); });
     cluster.addLayer(marker);
   });
-
   lmap.addLayer(cluster);
-
-  if(pts.length > 1){
-    const ln = L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00e5b0',weight:2,opacity:.5,dashArray:'5 8'}).addTo(lmap);
-    lmap.fitBounds(ln.getBounds(), {padding:[40,40]});
+  if(pts.length>1){
+    const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#00dba4',weight:2,opacity:.5,dashArray:'5 8'}).addTo(lmap);
+    lmap.fitBounds(ln.getBounds(),{padding:[40,40]});
   }
-  if(gps) {
-    L.circleMarker([gps.lat,gps.lng],{radius:10,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:.4,weight:3})
-      .addTo(lmap)
-      .bindPopup('<div style="font-family:monospace;font-size:11px;color:#60a5fa">📍 ตำแหน่งของคุณ</div>');
-  }
-  document.getElementById('offline-status').textContent = navigator.onLine?'online':'📴 offline';
+  if(gps) L.circleMarker([gps.lat,gps.lng],{radius:9,color:'#4f9cf9',fillColor:'#4f9cf9',fillOpacity:.35,weight:2.5}).addTo(lmap).bindPopup('<div style="font-family:monospace;font-size:10px;color:#60a5fa">📍 ตำแหน่งของคุณ</div>');
+  document.getElementById('offline-status').textContent=navigator.onLine?'online':'📴 offline';
 }
 
 window.addEventListener('online',()=>{ document.getElementById('offline-status').textContent='online'; toast('กลับมา online แล้ว'); });
 window.addEventListener('offline',()=>{ document.getElementById('offline-status').textContent='📴 offline'; toast('อยู่ในโหมด offline','bad'); });
 
 /* ================================================================
-   INIT SEQUENCE
+   INIT
 ================================================================ */
-window.addEventListener('load', () => {
-  // เริ่มต้นกระบวนการโหลดข้อมูลจาก Cloud แทน LocalStorage
-  loadDataFromCloud();
-});
-
-function finishInit() {
+window.addEventListener('load', () => { loadDataFromCloud(); });
+function finishInit(){
   loadSettingsUI();
   startCam('environment');
   startGPS();
   startClock();
   updCnt();
-  // แสดง modal เลือกโครงการตอนเปิดแอป
-  setTimeout(()=> openProjModal(true), 600);
+  setTimeout(() => openProjModal(true), 600);
 }
 </script>
 </body>
