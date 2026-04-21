@@ -999,12 +999,28 @@ function selectProject(name){
   renderProjBadge(); toast(name?'✓ เลือกโครงการ: '+name:'ไม่ระบุโครงการ','ok');
 }
 function addProject(){
-  const inp=document.getElementById('proj-new-inp'), name=inp.value.trim();
+  const inp  = document.getElementById('proj-new-inp');
+  const name = inp.value.trim();
   if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
   if(projects.includes(name)){ toast('มีโครงการนี้แล้ว','bad'); return; }
-  projects.push(name); saveProjectsToCloud(); inp.value='';
-  renderProjModalList(); renderProjSetList(); toast('✓ เพิ่มโครงการ: '+name,'ok');
-}
+ 
+  projects.push(name);
+  saveProjectsToCloud();
+  inp.value = '';
+  renderProjModalList();
+  renderProjSetList();
+  toast('✓ เพิ่มโครงการ: '+name,'ok');
+ 
+  // ⑨ สร้างโฟลเดอร์ใน Drive ทันที (ไม่รอถ่ายรูปแรก)
+  if(navigator.onLine){
+    gasPost({ action:'ensureProjectFolder', projectName:name })
+      .then(r=>{
+        if(r.status==='success'){
+          toast('📁 สร้างโฟลเดอร์ "'+name+'" แล้ว','ok');
+        }
+      })
+      .catch(err=>console.warn('ensureProjectFolder error:',err));
+  }
 function addProjectFromSettings(){
   const inp=document.getElementById('proj-set-inp'), name=inp.value.trim();
   if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
@@ -1013,11 +1029,49 @@ function addProjectFromSettings(){
   renderProjSetList(); toast('✓ เพิ่มโครงการ: '+name,'ok');
 }
 function deleteProject(name){
-  if(!confirm('ลบโครงการ "'+name+'" ?')) return;
-  projects=projects.filter(p=>p!==name);
-  if(cfg.project===name){ cfg.project=''; saveSetting('project',''); renderProjBadge(); }
-  saveProjectsToCloud(); renderProjModalList(); renderProjSetList();
-}
+  const cnt = photos.filter(p=>p.project===name).length;
+  const msg = cnt > 0
+    ? `ลบโครงการ "${name}" ?\n\nมีรูป ${cnt} รูปในโครงการนี้\nจะลบรูปทั้งหมด + โฟลเดอร์ใน Drive ด้วย`
+    : `ลบโครงการ "${name}" ?\n\nจะลบโฟลเดอร์ใน Drive ด้วย`;
+  if(!confirm(msg)) return;
+ 
+  // ลบออกจาก state ทันที
+  projects = projects.filter(p=>p!==name);
+  photos   = photos.filter(p=>p.project!==name);
+  if(cfg.project===name){
+    cfg.project='';
+    saveSetting('project','');
+    renderProjBadge();
+  }
+ 
+  updCnt();
+  renderProjModalList();
+  renderProjSetList();
+  toast('กำลังลบโครงการ "'+name+'" ...','');
+ 
+  // ⑩ ลบ Cloud: Sheet + โฟลเดอร์ Drive พร้อมกัน
+  if(navigator.onLine){
+    gasPost({ action:'deleteProject', projectName:name })
+      .then(r=>{
+        if(r.status==='success'){
+          const rows = r.rowsRemoved   || 0;
+          const fold = r.folderDeleted ? '📁 ลบโฟลเดอร์แล้ว' : '';
+          toast(`✓ ลบ "${name}" · ${rows} รูป ${fold}`.trim(),'ok');
+        } else {
+          toast('❌ ลบ Cloud ล้มเหลว: '+(r.message||''),'bad');
+        }
+      })
+      .catch(err=>{
+        console.warn('deleteProject error:',err);
+        toast('ลบจาก memory แล้ว (จะซิงค์ Cloud เมื่อออนไลน์)','');
+        // Queue ไว้ส่งทีหลัง
+        idbQueueDelete({ action:'deleteProject', projectName:name });
+      });
+  } else {
+    // Offline → queue ไว้ส่งเมื่อกลับมาออนไลน์
+    idbQueueDelete({ action:'deleteProject', projectName:name });
+    toast('ลบจาก memory แล้ว (จะซิงค์ Cloud เมื่อออนไลน์)','');
+  }
 function renderProjSetList(){
   const el=document.getElementById('proj-set-list'); if(!el) return;
   if(!projects.length){ el.innerHTML='<div style="color:var(--t2);font-size:11px;padding:8px 2px;">ยังไม่มีโครงการ</div>'; return; }
