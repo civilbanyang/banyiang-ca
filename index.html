@@ -876,7 +876,10 @@ async function loadDataFromCloud(){
     return;
   }
   try {
-    const res = await fetch(GAS_URL+'?action=getData&token='+APP_TOKEN);
+    const _ctrl = new AbortController();
+    const _tid  = setTimeout(()=>_ctrl.abort(), 10000);
+    const res = await fetch(GAS_URL+'?action=getData&token='+APP_TOKEN, {signal:_ctrl.signal});
+    clearTimeout(_tid);
     if(res.ok){
       const data = await res.json();
       if(data.settings){
@@ -1042,6 +1045,7 @@ function addProject(){
       })
       .catch(err=>console.warn('ensureProjectFolder error:',err));
   }
+}
 function addProjectFromSettings(){
   const inp=document.getElementById('proj-set-inp'), name=inp.value.trim();
   if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
