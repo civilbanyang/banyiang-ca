@@ -1,5 +1,5 @@
-const CACHE = 'scam5-v16';
-const TILE_CACHE = 'scam5-tiles-v16';
+const CACHE = 'scam5-v17';
+const TILE_CACHE = 'scam5-tiles-v17';
 const ASSETS = [
   '/banyiang-ca/',
   '/banyiang-ca/index.html',
