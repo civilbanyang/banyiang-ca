@@ -1600,8 +1600,8 @@ a{color:#3b82f6;}.map-wrap{height:300px;border-radius:10px;overflow:hidden;margi
 <div class="map-wrap" id="rmap"></div>
 <table><thead><tr><th>#</th><th>รูปภาพ</th><th>พิกัด</th><th>ความสูง</th><th>แม่นยำ</th><th>วันเวลา</th><th>โครงการ</th><th>Maps</th></tr></thead>
 <tbody>${rows}</tbody></table>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
-<script>const pts=[${ptsJS}];if(pts.length){const m=L.map('rmap').setView(pts[0],14);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);pts.forEach((p,i)=>{L.marker(p).addTo(m).bindTooltip(''+(i+1));});if(pts.length>1){L.polyline(pts,{color:'#00dba4',weight:2,dashArray:'4 6'}).addTo(m);m.fitBounds(L.latLngBounds(pts),{padding:[20,20]});}}<\/script>
+<\u0073cript src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<\u0073cript>const pts=[${ptsJS}];if(pts.length){const m=L.map('rmap').setView(pts[0],14);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);pts.forEach((p,i)=>{L.marker(p).addTo(m).bindTooltip(''+(i+1));});if(pts.length>1){L.polyline(pts,{color:'#00dba4',weight:2,dashArray:'4 6'}).addTo(m);m.fitBounds(L.latLngBounds(pts),{padding:[20,20]});}}<\/script>
 </body></html>`;
   setP(90,'บันทึกไฟล์...');
   await new Promise(r=>setTimeout(r,100));
