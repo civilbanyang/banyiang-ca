@@ -161,6 +161,22 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 /* idb pending badge */
 .p-idb{position:absolute;top:7px;left:7px;background:rgba(245,166,35,.85);border-radius:8px;padding:2px 6px;font-size:8px;color:#000;font-weight:700;z-index:2;}
 
+/* PHOTOS FILTER BAR */
+#photos-filter-bar{
+  display:flex;gap:6px;padding:8px 12px;overflow-x:auto;
+  border-bottom:1px solid var(--br);background:var(--s1);flex-shrink:0;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+#photos-filter-bar::-webkit-scrollbar{display:none;}
+.pf-chip{
+  flex-shrink:0;padding:5px 12px;border-radius:16px;
+  border:1px solid var(--br2);background:var(--s2);
+  color:var(--t2);font-family:var(--fn);font-size:9px;font-weight:600;
+  cursor:pointer;white-space:nowrap;transition:all .15s;
+}
+.pf-chip.on{background:var(--ad);border-color:var(--ag);color:var(--ac);}
+.pf-chip:active{opacity:.7;}
+
 /* VIEWER */
 #vwrap{flex:1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0;position:relative;}
 #vimg{max-width:100%;max-height:100%;object-fit:contain;display:block;}
@@ -466,6 +482,10 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
       <span class="pt">🗂 รูปภาพ</span>
       <button class="bk" onclick="goBack()">← กลับ</button>
     </div>
+    <!-- filter chips -->
+    <div id="photos-filter-bar">
+      <span class="pf-chip on" onclick="setPhotoFilter('all',this)">ทั้งหมด</span>
+    </div>
     <div class="photos-toolbar">
       <span class="ptcount" id="photos-count-lbl">0 รูป</span>
       <button class="sync-btn" onclick="syncAllUnuploaded()">☁️ ส่งรูปที่ค้าง</button>
@@ -650,6 +670,7 @@ let cfg = { grid:false, timer:0, res:'4k', gpsThresh:15, qr:false, project:'' };
 let projects = [];
 let mapFilterProject = 'all';
 let expFilterProject = 'all';   // for export page
+let photoFilterProject = 'all'; // for photos page
 
 const resMap = {
   '4k': {width:{ideal:4096},height:{ideal:2160}},
@@ -941,8 +962,8 @@ function updCnt(){
   }
   const pi=document.getElementById('photo-count-info');
   if(pi) pi.textContent=n+' รูป ใน Cloud';
-  const pcl=document.getElementById('photos-count-lbl');
-  if(pcl) pcl.textContent=n+' รูป';
+  // photos-count-lbl updated inside renderPhotos now
+  renderPhotosFilterBar();
   updateIDBCountUI();
   updateExpFilterChips();
   updateExpCountLabel();
@@ -1021,7 +1042,6 @@ function addProject(){
       })
       .catch(err=>console.warn('ensureProjectFolder error:',err));
   }
-}
 function addProjectFromSettings(){
   const inp=document.getElementById('proj-set-inp'), name=inp.value.trim();
   if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
@@ -1073,7 +1093,6 @@ function deleteProject(name){
     idbQueueDelete({ action:'deleteProject', projectName:name });
     toast('ลบจาก memory แล้ว (จะซิงค์ Cloud เมื่อออนไลน์)','');
   }
-}
 function renderProjSetList(){
   const el=document.getElementById('proj-set-list'); if(!el) return;
   if(!projects.length){ el.innerHTML='<div style="color:var(--t2);font-size:11px;padding:8px 2px;">ยังไม่มีโครงการ</div>'; return; }
@@ -1323,18 +1342,62 @@ function getDriveImgUrl(url){
   catch(e){}
   return url;
 }
+/* ── Photos filter helpers ───────────────────────────────── */
+function renderPhotosFilterBar(){
+  const bar = document.getElementById('photos-filter-bar');
+  if(!bar) return;
+  // รวบรวมโครงการจาก photos ทั้งหมด
+  const projs = [...new Set(photos.map(p=>p.project||'').filter(Boolean))].sort();
+  let html = `<span class="pf-chip${photoFilterProject==='all'?' on':''}" onclick="setPhotoFilter('all',this)">ทั้งหมด <b>${photos.length}</b></span>`;
+  // ไม่ระบุโครงการ (ถ้ามี)
+  const noProj = photos.filter(p=>!p.project?.trim()).length;
+  if(noProj > 0)
+    html += `<span class="pf-chip${photoFilterProject==='__none__'?' on':''}" onclick="setPhotoFilter('__none__',this)">ไม่ระบุ <b>${noProj}</b></span>`;
+  projs.forEach(pj=>{
+    const cnt = photos.filter(p=>p.project===pj).length;
+    const safe = pj.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    html += `<span class="pf-chip${photoFilterProject===pj?' on':''}" onclick="setPhotoFilter('${safe}',this)">${pj} <b>${cnt}</b></span>`;
+  });
+  bar.innerHTML = html;
+}
+function setPhotoFilter(proj, el){
+  photoFilterProject = proj;
+  document.querySelectorAll('.pf-chip').forEach(c=>c.classList.remove('on'));
+  if(el) el.classList.add('on');
+  renderPhotos();
+}
+function getFilteredPhotos(){
+  if(photoFilterProject==='all') return photos;
+  if(photoFilterProject==='__none__') return photos.filter(p=>!p.project?.trim());
+  return photos.filter(p=>p.project===photoFilterProject);
+}
+
 function renderPhotos(){
-  const g=document.getElementById('pgrid');
+  const g = document.getElementById('pgrid');
   updCnt();
-  if(!photos.length){ g.innerHTML='<div class="emp"><span class="emp-icon">📷</span>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>'; return; }
-  g.innerHTML=photos.map((p,i)=>{
-    const d=new Date(p.dt);
+  renderPhotosFilterBar();
+  const list = getFilteredPhotos();
+  // อัปเดต label จำนวน
+  const lbl = document.getElementById('photos-count-lbl');
+  if(lbl) lbl.textContent = photoFilterProject==='all'
+    ? `${photos.length} รูป`
+    : `${list.length} / ${photos.length} รูป`;
+  if(!list.length){
+    g.innerHTML = photos.length
+      ? '<div class="emp"><span class="emp-icon">🔍</span>ไม่มีรูปในโครงการนี้</div>'
+      : '<div class="emp"><span class="emp-icon">📷</span>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';
+    return;
+  }
+  g.innerHTML = list.map((p,i)=>{
+    // หา index จริงใน photos[] เพื่อ openV ถูก
+    const realIdx = photos.indexOf(p);
+    const d = new Date(p.dt);
     const isLocal = !p.uploaded && p.dataURL?.startsWith('data:');
-    const syncBadge=`<div class="p-sync ${p.uploaded?'ok':''}">${p.uploaded?'☁':'⏳'}</div>`;
-    const localBadge=isLocal?`<div class="p-idb">IDB</div>`:'';
-    const imgSrc=p.uploaded&&p.dataURL?.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL;
-    const projTag=p.project?`<div class="ppj">${p.project}</div>`:'';
-    return `<div class="pc" style="animation-delay:${Math.min(i,10)*0.04}s" onclick="openV(${i})">
+    const syncBadge = `<div class="p-sync ${p.uploaded?'ok':''}">${p.uploaded?'☁':'⏳'}</div>`;
+    const localBadge = isLocal ? `<div class="p-idb">IDB</div>` : '';
+    const imgSrc = p.uploaded&&p.dataURL?.startsWith('http') ? getDriveImgUrl(p.dataURL) : p.dataURL;
+    const projTag = p.project ? `<div class="ppj">${p.project}</div>` : '';
+    return `<div class="pc" style="animation-delay:${Math.min(i,10)*0.04}s" onclick="openV(${realIdx})">
       ${syncBadge}${localBadge}
       <img src="${imgSrc}" loading="lazy" alt="" onerror="this.onerror=null;this.style.opacity='0.3'">
       <div class="pm"><div class="pdt">${fD(d)} ${fT(d)}</div><div class="pco">${p.lat?p.lat.toFixed(5)+', '+p.lng.toFixed(5):'ไม่มี GPS'}</div>${projTag}</div>
