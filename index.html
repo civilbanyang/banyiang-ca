@@ -1021,6 +1021,7 @@ function addProject(){
       })
       .catch(err=>console.warn('ensureProjectFolder error:',err));
   }
+}
 function addProjectFromSettings(){
   const inp=document.getElementById('proj-set-inp'), name=inp.value.trim();
   if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
@@ -1072,6 +1073,7 @@ function deleteProject(name){
     idbQueueDelete({ action:'deleteProject', projectName:name });
     toast('ลบจาก memory แล้ว (จะซิงค์ Cloud เมื่อออนไลน์)','');
   }
+}
 function renderProjSetList(){
   const el=document.getElementById('proj-set-list'); if(!el) return;
   if(!projects.length){ el.innerHTML='<div style="color:var(--t2);font-size:11px;padding:8px 2px;">ยังไม่มีโครงการ</div>'; return; }
