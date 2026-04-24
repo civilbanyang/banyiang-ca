@@ -14,15 +14,17 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 :root{
-  --bg:#060a10;--s1:#0b1018;--s2:#101620;--s3:#161e2c;--s4:#1c2738;
-  --ac:#00dba4;--ac2:#00b88c;--ad:rgba(0,219,164,.12);--ag:rgba(0,219,164,.28);--al:rgba(0,219,164,.06);
-  --bl:#4f9cf9;--bld:rgba(79,156,249,.12);
-  --wn:#f5a623;--dn:#f04444;--dnd:rgba(240,68,68,.12);
-  --tx:#e8eef8;--t2:#8899b0;--t3:#4a5a70;
-  --br:rgba(255,255,255,.065);--br2:rgba(255,255,255,.12);--br3:rgba(255,255,255,.18);
-  --fn:'SF Mono','Fira Code','Courier New',monospace;
-  --r:14px;--r2:10px;
+  --bg:#05080f;--s1:#090d15;--s2:#0e1420;--s3:#131b28;--s4:#192130;
+  --ac:#00e5b0;--ac2:#00c99a;--ad:rgba(0,229,176,.11);--ag:rgba(0,229,176,.3);--al:rgba(0,229,176,.05);
+  --bl:#5aa3ff;--bld:rgba(90,163,255,.12);
+  --wn:#ffaa2e;--dn:#ff4d4d;--dnd:rgba(255,77,77,.11);
+  --tx:#dde8f5;--t2:#7a8fa8;--t3:#3d5068;
+  --br:rgba(255,255,255,.055);--br2:rgba(255,255,255,.10);--br3:rgba(255,255,255,.16);
+  --fn:'SF Mono','JetBrains Mono','Fira Code','Courier New',monospace;
+  --r:16px;--r2:11px;--r3:8px;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+  --glow:0 0 20px rgba(0,229,176,.18);
+  --card-shadow:0 2px 16px rgba(0,0,0,.35);
 }
 html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%;overflow:hidden;}
 #app{display:flex;flex-direction:column;height:100dvh;position:relative;overflow:hidden;}
@@ -284,48 +286,150 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 .proj-set-del:active{opacity:1;}
 
 
-/* QUICK PROJECT BAR (below shutter) */
-#quick-proj-bar{
-  display:flex;gap:6px;padding:6px 12px 0;overflow-x:auto;
-  background:var(--s1);flex-shrink:0;
-  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+/* ── IMPROVED DESIGN TOKENS ─────────────────────────────────── */
+:root{
+  --bg:#05080f;--s1:#090d15;--s2:#0e1420;--s3:#131b28;--s4:#192130;
+  --ac:#00e5b0;--ac2:#00c99a;--ad:rgba(0,229,176,.11);--ag:rgba(0,229,176,.3);--al:rgba(0,229,176,.05);
+  --bl:#5aa3ff;--bld:rgba(90,163,255,.12);
+  --wn:#ffaa2e;--dn:#ff4d4d;--dnd:rgba(255,77,77,.11);
+  --tx:#dde8f5;--t2:#7a8fa8;--t3:#3d5068;
+  --br:rgba(255,255,255,.055);--br2:rgba(255,255,255,.10);--br3:rgba(255,255,255,.16);
+  --fn:'SF Mono','JetBrains Mono','Fira Code','Courier New',monospace;
+  --r:16px;--r2:11px;--r3:8px;
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+  --glow:0 0 20px rgba(0,229,176,.18);
+  --card-shadow:0 2px 16px rgba(0,0,0,.35);
 }
-#quick-proj-bar::-webkit-scrollbar{display:none;}
+
+/* ── VIEWER img — object-fit contain + bg ────────────────────── */
+#vimg{ max-width:100%;max-height:100%;object-fit:contain;display:block;
+  image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges; }
+
+/* ── PHOTO GRID — better cards ───────────────────────────────── */
+#pgrid{ grid-template-columns:repeat(2,1fr);gap:10px;padding:12px; }
+.pc{ border-radius:13px;box-shadow:var(--card-shadow); }
+.pc img{ aspect-ratio:4/3;border-radius:13px 13px 0 0; }
+.pm{ padding:9px 11px 10px; }
+.pdt{ font-size:9px;color:var(--t2); }
+.pco{ font-size:9.5px;color:var(--ac);font-weight:700;margin-top:2px; }
+.ppj{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:8px;padding:2px 8px;border-radius:20px;
+  background:var(--ad);border:1px solid var(--ag);color:var(--ac);
+  margin-top:5px;
+}
+
+/* ── VIEWER BOTTOM — tighter, cleaner ──────────────────────────  */
+#vbot{ padding:10px 14px calc(10px + var(--sb));gap:0; }
+.info-grid{ gap:5px;margin-bottom:5px; }
+.info-cell{ border-radius:9px;padding:6px 10px; }
+.info-proj{ border-radius:9px;padding:6px 10px;margin-bottom:5px; }
+.arow{ gap:4px; }
+.ab{ border-radius:10px;padding:8px 4px;font-size:8.5px; }
+
+/* ── HUD GPS badge — more readable ────────────────────────────── */
+#hgps{
+  font-size:9px;padding:4px 10px;border-radius:20px;
+  font-weight:700;letter-spacing:.04em;
+  border-width:1.5px;
+}
+
+/* ── SHUTTER — glowing ring ──────────────────────────────────── */
+#bshut{
+  width:78px;height:78px;
+  border:3px solid var(--ac);
+  box-shadow:var(--glow),0 0 0 0 rgba(0,229,176,.2);
+}
+#bshut.fl{ box-shadow:var(--glow),0 0 0 16px rgba(0,229,176,.1); }
+#sinr{ width:64px;height:64px;background:var(--ac); }
+
+/* ── QUICK PROJ BAR — pill style ─────────────────────────────── */
+#quick-proj-bar{ padding:8px 14px 0;gap:7px; }
 .qp-chip{
-  flex-shrink:0;padding:4px 11px;border-radius:14px;
-  border:1px solid var(--br2);background:var(--s2);
-  color:var(--t2);font-family:var(--fn);font-size:9px;font-weight:600;
-  cursor:pointer;white-space:nowrap;transition:all .15s;
+  padding:5px 13px;border-radius:20px;
+  font-size:9px;font-weight:700;letter-spacing:.04em;
 }
-.qp-chip.on{background:var(--ad);border-color:var(--ag);color:var(--ac);}
-.qp-chip:active{opacity:.7;}
-.qp-chip.add{border-style:dashed;color:var(--t3);}
-
-/* STAMP QUALITY BADGE on viewfinder */
-#stamp-quality{
-  position:absolute;bottom:110px;right:14px;z-index:6;
-  padding:3px 9px;border-radius:14px;
-  font-size:9px;font-weight:700;font-family:var(--fn);
-  border:1px solid rgba(255,255,255,.15);
-  background:rgba(6,10,16,.7);color:var(--t2);
-  pointer-events:none;
+.qp-chip.on{
+  background:var(--ac);color:#000;border-color:var(--ac);
+  box-shadow:0 0 12px rgba(0,229,176,.3);
 }
-#stamp-quality.hi{border-color:var(--ag);color:var(--ac);}
-#stamp-quality.lo{border-color:rgba(245,166,35,.4);color:var(--wn);}
 
-/* SYNC PROGRESS BAR */
+/* ── NAV BAR — solid indicator line ─────────────────────────── */
+#nav{ padding-bottom:0; }
+.ntab{ padding:10px 4px calc(10px + var(--sb));font-size:8px;letter-spacing:.08em; }
+.ntab .ni{ font-size:18px; }
+.ntab.on{ color:var(--ac);border-top-color:var(--ac);background:rgba(0,229,176,.04); }
+
+/* ── PANEL HEADERS — larger title ───────────────────────────── */
+.pt{ font-size:13px;letter-spacing:.1em; }
+.ph{ padding:calc(var(--st)+16px) 18px 16px; }
+
+/* ── SETTINGS rows — better spacing ─────────────────────────── */
+.set-row{ padding:14px 16px;border-radius:13px;margin-bottom:6px; }
+.set-lbl{ font-size:12px; }
+.set-sub{ font-size:9.5px;margin-top:3px; }
+
+/* ── PROJECT MODAL ITEM — camera button style ───────────────── */
+.proj-item{ padding:12px 14px;border-radius:13px;margin-bottom:6px; }
+.proj-item-name{ font-size:13px; }
+.proj-item-ico{ width:38px;height:38px;border-radius:11px;font-size:17px; }
+
+/* ── FILTER CHIPS — consistent style ───────────────────────── */
+.pf-chip,.mf-chip,.exp-chip{
+  padding:5px 13px;border-radius:20px;font-size:9px;
+  font-weight:700;letter-spacing:.04em;
+}
+.pf-chip.on,.mf-chip.active,.exp-chip.on{
+  background:var(--ad);border-color:var(--ag);color:var(--ac);
+  box-shadow:0 0 8px rgba(0,229,176,.15);
+}
+
+/* ── TOAST — better readability ─────────────────────────────── */
+#toast{
+  padding:11px 22px;border-radius:28px;
+  font-size:11px;letter-spacing:.04em;font-weight:600;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);
+}
+
+/* ── SYNC PROGRESS — cleaner ────────────────────────────────── */
 #sync-progress-wrap{
-  position:fixed;bottom:calc(80px + var(--sb));left:50%;transform:translateX(-50%);
-  z-index:600;background:rgba(11,16,24,.95);
-  border:1px solid var(--br2);border-radius:16px;
-  padding:10px 16px;min-width:200px;max-width:80vw;
-  display:none;flex-direction:column;gap:6px;
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-radius:20px;padding:12px 18px;
+  box-shadow:0 4px 24px rgba(0,0,0,.5);
 }
-#sync-progress-wrap.show{display:flex;}
-#sync-prog-label{font-size:10px;color:var(--tx);text-align:center;}
-#sync-prog-bar{height:3px;background:var(--s4);border-radius:2px;overflow:hidden;}
-#sync-prog-fill{height:100%;background:var(--ac);width:0%;transition:width .3s;}
+#sync-prog-label{ font-size:11px;font-weight:600; }
+#sync-prog-bar{ height:4px;border-radius:2px; }
+
+/* ── IDB STATUS BADGE ────────────────────────────────────────── */
+#idb-status{
+  border-radius:20px;padding:6px 12px;
+  font-size:9.5px;font-weight:700;
+  box-shadow:0 2px 12px rgba(0,0,0,.3);
+}
+
+/* ── STAMP QUALITY BADGE ─────────────────────────────────────── */
+#stamp-quality{
+  bottom:auto;top:calc(var(--st)+108px);right:14px;
+  font-size:8px;padding:3px 8px;border-radius:10px;
+  background:rgba(5,8,15,.75);letter-spacing:.04em;
+}
+
+/* ── PHOTOS TOOLBAR — inline counts ────────────────────────── */
+.photos-toolbar{
+  padding:8px 14px;gap:8px;
+}
+.ptcount{ font-size:10px;font-weight:600;color:var(--tx); }
+
+/* ── ACTION BUTTONS — grouped ───────────────────────────────── */
+.arow{ display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px; }
+.ab{ min-width:0;padding:9px 4px;font-size:8.5px;border-radius:10px; }
+
+/* ── GPS lock overlay ────────────────────────────────────────── */
+.lacc{ font-size:28px;letter-spacing:-.02em;font-weight:800; }
+.lskip{ border-radius:28px;padding:11px 28px;font-size:10.5px; }
+
+/* ── SPLASH ──────────────────────────────────────────────────── */
+.splash-icon{ box-shadow:0 0 48px rgba(0,229,176,.5),0 0 96px rgba(0,229,176,.2); }
+.splash-name{ font-size:24px;letter-spacing:.12em; }
 
 #cvs{display:none;}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999;transition:opacity .05s;}
@@ -388,7 +492,6 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
         <div class="lacc" id="lacv">-- m</div>
         <button class="lskip" onclick="skipLock()">ข้าม — ถ่ายทันที</button>
       </div>
-      <div id="stamp-quality">JPEG ✓</div>
       <div id="gbot">
         <div id="cstrip">
           <div class="ci"><span class="cl">LAT</span><span class="cv" id="olat">--</span></div>
@@ -410,8 +513,6 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
       <button id="bshut" onclick="pressShutter()"><div id="sinr"></div></button>
       <button id="bset" onclick="goPg('settings')" title="ตั้งค่า">⚙</button>
     </div>
-    <!-- QUICK PROJECT SWITCHER -->
-    <div id="quick-proj-bar"></div>
     <div id="nav">
       <button class="ntab on" onclick="switchTab(this,'cam')">
         <span class="ni">📷</span><span class="nl">กล้อง</span>
@@ -587,11 +688,24 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 
   <!-- VIEWER -->
   <div id="pg-viewer" class="page">
-    <div class="ph" style="background:#000;border-bottom-color:rgba(255,255,255,.07);">
-      <span class="pt" id="vtit">ภาพ 1/1</span>
+    <div class="ph" style="background:#000;border-bottom-color:rgba(5,8,15,.9);">
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <span class="pt" id="vtit" style="font-size:11px;">ภาพ 1/1</span>
+        <span id="v-proj-tag" style="font-size:9px;color:var(--ac);display:none;"></span>
+      </div>
       <button class="bk" onclick="goBack()">← กลับ</button>
     </div>
     <div id="vwrap">
+      <!-- Loading overlay for high-res image -->
+      <div id="vimg-loading" style="
+        position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+        background:rgba(5,8,15,.6);z-index:5;pointer-events:none;opacity:0;transition:opacity .2s;
+      ">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;border:2px solid var(--s4);border-top-color:var(--ac);animation:spin .7s linear infinite;"></div>
+          <div style="font-size:9px;color:var(--ac);letter-spacing:.1em;">โหลดรูปคุณภาพสูง</div>
+        </div>
+      </div>
       <img id="vimg" alt="">
       <button class="v-nav-btn" id="v-prev" onclick="navViewer(-1)">‹</button>
       <button class="v-nav-btn" id="v-next" onclick="navViewer(1)">›</button>
@@ -666,10 +780,6 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 <!-- IDB pending indicator -->
 <div id="idb-status">⏳ <span id="idb-pending-n">0</span> รูปรอส่ง</div>
 
-<div id="sync-progress-wrap">
-  <div id="sync-prog-label">กำลังซิงค์...</div>
-  <div id="sync-prog-bar"><div id="sync-prog-fill"></div></div>
-</div>
 <div id="flash"></div>
 <div id="toast"></div>
 
@@ -811,10 +921,10 @@ function scheduleRetry(){
 async function _doUploadOne(p){
   const d = new Date(p.dt);
   const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
-  // ③ Compress รูปก่อน upload ไม่เกิน 2048px
+  // ③ Smart encode: คงความละเอียดเต็ม ปรับ quality อัตโนมัติ
   let dataURL = p.dataURL;
   if(dataURL?.startsWith('data:')){
-    dataURL = await compressImage(dataURL, 2048, 0.82);
+    dataURL = await compressImage(dataURL);   // ไม่ resize, ปรับ q อัตโนมัติ
   }
   const payload = { token:APP_TOKEN, action:'uploadPhoto', id:p.id, dataURL, filename:fname,
     lat:p.lat||'', lng:p.lng||'', alt:p.alt||'', acc:p.acc||'', dt:p.dt, project:p.project||'' };
@@ -828,22 +938,34 @@ async function _doUploadOne(p){
   return false;
 }
 
-/* ③ Compress image ก่อน upload (แก้ปัญหา base64 เกิน GAS limit) */
-function compressImage(dataURL, maxPx, quality){
+/* ③ Smart encode — ไม่ลด resolution, ปรับ quality อัจฉริยะ
+   ลำดับการลอง: q0.95 → q0.88 → q0.80 (ถ้าไฟล์ใหญ่เกิน ~18MB base64)
+   รักษาความคมชัดเต็มที่โดยไม่ resize */
+async function compressImage(dataURL, _maxPx, _quality){
+  if(!dataURL?.startsWith('data:')) return dataURL;
   return new Promise(res=>{
     const img = new Image();
     img.onload = ()=>{
-      let w=img.width, h=img.height;
-      if(w > maxPx || h > maxPx){
-        if(w >= h){ h=Math.round(h*(maxPx/w)); w=maxPx; }
-        else { w=Math.round(w*(maxPx/h)); h=maxPx; }
-      }
+      const W = img.naturalWidth, H = img.naturalHeight;
       const cv = document.createElement('canvas');
-      cv.width=w; cv.height=h;
-      cv.getContext('2d').drawImage(img,0,0,w,h);
-      res(cv.toDataURL('image/jpeg', quality));
+      cv.width = W; cv.height = H;
+      const ctx = cv.getContext('2d', {alpha:false});
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, W, H);
+
+      // ลอง quality สูงก่อน ลดถ้าไฟล์ใหญ่เกินไป (~18MB base64 ≈ 13.5MB binary)
+      const targets = [0.95, 0.88, 0.80];
+      let result = dataURL;
+      for(const q of targets){
+        const out = cv.toDataURL('image/jpeg', q);
+        result = out;
+        // base64 length / 1.37 ≈ bytes → ถ้า < 18MB ใช้ได้
+        if(out.length < 18 * 1024 * 1024 * 1.37) break;
+      }
+      res(result);
     };
-    img.onerror = ()=>res(dataURL); // ถ้าล้มเหลวให้ใช้ original
+    img.onerror = ()=>res(dataURL);
     img.src = dataURL;
   });
 }
@@ -927,7 +1049,6 @@ async function loadDataFromCloud(){
       for(const ip of idbAll){
         if(!cloudIds.has(ip.id) && ip.uploaded) await idbRemovePhoto(ip.id);
       }
-      clearTimeout(window._splashTimeout);
       toast('ซิงค์ข้อมูลสำเร็จ','ok');
     }
   } catch(err){
@@ -975,7 +1096,7 @@ function updCnt(){
   if(n>0){
     c.style.display='flex'; c.textContent=n>99?'99+':n;
     const p0=photos[0];
-    const src=p0.uploaded&&p0.dataURL?.startsWith('http')?getDriveImgUrl(p0.dataURL):p0.dataURL;
+    const src=p0.uploaded&&p0.dataURL?.startsWith('http')?getDriveThumb(p0.dataURL):p0.dataURL;
     document.getElementById('gthumb').src=src;
     document.getElementById('gthumb').style.display='block';
     document.getElementById('gicon').style.display='none';
@@ -993,8 +1114,8 @@ function updCnt(){
   }
   const pi=document.getElementById('photo-count-info');
   if(pi) pi.textContent=n+' รูป ใน Cloud';
-  // photos-count-lbl updated inside renderPhotos
-  renderQuickProjBar();   // อัปเดต quick project chips ด้านล่างกล้อง
+  const pcl=document.getElementById('photos-count-lbl');
+  if(pcl) pcl.textContent=n+' รูป';
   updateIDBCountUI();
   updateExpFilterChips();
   updateExpCountLabel();
@@ -1038,24 +1159,17 @@ function renderProjModalList(){
     const safe=pj.replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return `<div class="proj-item${isCur?' sel':''}" onclick="selectProject('${safe}')">
       <div class="proj-item-ico">🏗</div>
-      <div class="proj-item-info">
-        <div class="proj-item-name">${pj}</div>
-        <div class="proj-item-count">${cnt} รูป${isCur?' · ✓ ใช้อยู่':''}</div>
-      </div>
-      <button style="background:var(--ad);border:1px solid var(--ag);color:var(--ac);font-family:var(--fn);font-size:8px;padding:4px 8px;border-radius:8px;cursor:pointer;white-space:nowrap;margin-right:4px;"
-        onclick="event.stopPropagation();selectProject('${safe}',true)">📷 ถ่ายเลย</button>
+      <div class="proj-item-info"><div class="proj-item-name">${pj}</div><div class="proj-item-count">${cnt} รูป${isCur?' · ✓ ใช้อยู่':''}</div></div>
       <button class="proj-item-del" onclick="event.stopPropagation();deleteProject('${safe}')">✕</button>
     </div>`;
   }).join('');
 }
-function selectProject(name, andShoot){
+function selectProject(name){
   cfg.project=name||''; saveSetting('project',cfg.project); closeProjModal();
   document.getElementById('inp-project').value=cfg.project;
   const lbl=document.getElementById('inp-project-label');
   if(lbl) lbl.textContent=cfg.project||'เลือก...';
-  renderProjBadge(); renderQuickProjBar();
-  toast(name?'✓ '+name:'ไม่ระบุโครงการ','ok');
-  if(andShoot) setTimeout(()=>pressShutter(), 300);
+  renderProjBadge(); toast(name?'✓ เลือกโครงการ: '+name:'ไม่ระบุโครงการ','ok');
 }
 function addProject(){
   const inp  = document.getElementById('proj-new-inp');
@@ -1068,7 +1182,6 @@ function addProject(){
   inp.value = '';
   renderProjModalList();
   renderProjSetList();
-  renderQuickProjBar();
   toast('✓ เพิ่มโครงการ: '+name,'ok');
  
   // ⑨ สร้างโฟลเดอร์ใน Drive ทันที (ไม่รอถ่ายรูปแรก)
@@ -1087,13 +1200,7 @@ function addProjectFromSettings(){
   if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
   if(projects.includes(name)){ toast('มีโครงการนี้แล้ว','bad'); return; }
   projects.push(name); saveProjectsToCloud(); inp.value='';
-  renderProjSetList(); renderQuickProjBar(); toast('✓ เพิ่มโครงการ: '+name,'ok');
-  // สร้างโฟลเดอร์ Drive ทันที (เหมือน addProject)
-  if(navigator.onLine){
-    gasPost({ action:'ensureProjectFolder', projectName:name })
-      .then(r=>{ if(r.status==='success') toast('📁 สร้างโฟลเดอร์ "'+name+'" แล้ว','ok'); })
-      .catch(err=>console.warn('ensureProjectFolder err:',err));
-  }
+  renderProjSetList(); toast('✓ เพิ่มโครงการ: '+name,'ok');
 }
 function deleteProject(name){
   const cnt = photos.filter(p=>p.project===name).length;
@@ -1102,9 +1209,7 @@ function deleteProject(name){
     : `ลบโครงการ "${name}" ?\n\nจะลบโฟลเดอร์ใน Drive ด้วย`;
   if(!confirm(msg)) return;
  
-  // ลบออกจาก state + IDB ทันที
-  const toRemove = photos.filter(p=>p.project===name);
-  toRemove.forEach(p=>idbRemovePhoto(p.id));   // ลบออกจาก IDB ด้วย
+  // ลบออกจาก state ทันที
   projects = projects.filter(p=>p!==name);
   photos   = photos.filter(p=>p.project!==name);
   if(cfg.project===name){
@@ -1116,7 +1221,6 @@ function deleteProject(name){
   updCnt();
   renderProjModalList();
   renderProjSetList();
-  renderQuickProjBar();
   toast('กำลังลบโครงการ "'+name+'" ...','');
  
   // ⑩ ลบ Cloud: Sheet + โฟลเดอร์ Drive พร้อมกัน
@@ -1153,75 +1257,6 @@ function renderProjSetList(){
   }).join('');
 }
 function saveProjectsToCloud(){ saveAllSettings(); }
-
-
-/* ── Quick Project Bar (หน้ากล้อง) ──────────────────────────── */
-function renderQuickProjBar(){
-  const bar = document.getElementById('quick-proj-bar');
-  if(!bar) return;
-  if(!projects.length){
-    bar.innerHTML = `<span class="qp-chip add" onclick="openProjModal(false)">+ เพิ่มโครงการ</span>`;
-    return;
-  }
-  let html = '';
-  projects.forEach(pj=>{
-    const safe = pj.replace(/'/g,"\'").replace(/"/g,'&quot;');
-    const on = cfg.project===pj;
-    html += `<span class="qp-chip${on?' on':''}" onclick="quickSelectProj('${safe}')">${on?'✓ ':''+(pj.length>10?pj.slice(0,10)+'…':pj)}</span>`;
-  });
-  html += `<span class="qp-chip add" onclick="openProjModal(false)">＋</span>`;
-  bar.innerHTML = html;
-}
-function quickSelectProj(name){
-  // เลือกโครงการจากหน้ากล้องโดยตรง ไม่ต้องเข้า modal
-  cfg.project = name;
-  saveSetting('project', name);
-  renderProjBadge();
-  renderQuickProjBar();
-  toast('📋 '+name, 'ok');
-}
-
-/* ── helper: refresh filter bars without triggering renderPhotos ── */
-function _refreshFilterBarsOnly(){
-  renderQuickProjBar();
-  renderPhotosFilterBar();
-}
-
-/* ── syncAllUnuploaded with real progress bar ─────────────────── */
-async function syncAllUnuploaded(){
-  const pending = photos.filter(p=>!p.uploaded);
-  if(!pending.length){ toast('รูปทั้งหมดอัปโหลดแล้ว ✅','ok'); return; }
-  if(!navigator.onLine){ toast('กรุณาเชื่อมต่ออินเทอร์เน็ตก่อน','bad'); return; }
-  if(pending.length > 5 && !confirm(`มีรูปที่ยังไม่ได้อัปโหลด ${pending.length} รูป ต้องการส่งตอนนี้?`)) return;
-
-  // แสดง progress bar
-  const wrap  = document.getElementById('sync-progress-wrap');
-  const fill  = document.getElementById('sync-prog-fill');
-  const label = document.getElementById('sync-prog-label');
-  wrap.classList.add('show');
-  let done = 0;
-  const total = pending.length;
-  const updateProg = ()=>{
-    const pct = Math.round((done/total)*100);
-    fill.style.width = pct+'%';
-    label.textContent = `ซิงค์ ${done}/${total} รูป...`;
-  };
-  updateProg();
-
-  for(const p of pending){
-    if(!_uploadQueue.find(x=>x.id===p.id)) _uploadQueue.push(p);
-  }
-  // patch processQueue เพื่อ track progress
-  const origDone = _uploadQueue.length - pending.length;
-  const iv = setInterval(()=>{
-    done = total - _uploadQueue.filter(x=>pending.find(p=>p.id===x.id)).length;
-    updateProg();
-    if(done >= total){ clearInterval(iv); setTimeout(()=>wrap.classList.remove('show'),1200); }
-  }, 500);
-
-  _uploading = false;
-  processQueue();
-}
 
 /* ================================================================
    PAGE NAV
@@ -1371,16 +1406,9 @@ function doCapture(){
   const bs=document.getElementById('bshut');
   bs.classList.add('fl'); document.getElementById('flash').classList.add('on');
   setTimeout(()=>{ document.getElementById('flash').classList.remove('on'); bs.classList.remove('fl'); },140);
-
-  // ── ความคมชัด: ใช้ความละเอียดเต็มของกล้อง ──────────────
   const W=v.videoWidth, H=v.videoHeight;
-  const dpr = window.devicePixelRatio || 1;
-  const cv=document.getElementById('cvs');
-  cv.width=W; cv.height=H;
-  // getContext พร้อม alpha:false เพื่อประสิทธิภาพ JPEG
-  const ctx=cv.getContext('2d', {alpha:false, willReadFrequently:false});
-  ctx.imageSmoothingEnabled=true;
-  ctx.imageSmoothingQuality='high';
+  const cv=document.getElementById('cvs'); cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
   if(facing==='user'){ ctx.translate(W,0); ctx.scale(-1,1); }
   ctx.drawImage(v,0,0,W,H);
   if(facing==='user') ctx.setTransform(1,0,0,1,0,0);
@@ -1397,10 +1425,7 @@ function doCapture(){
     {t:'[ไม่มีข้อมูล GPS]',c:'#f5a623'},{t:`${fD(now)}  ${fT(now)}`,c:'#e2e8f0'},
     ...(proj?[{t:proj,c:'#00dba4'}]:[]),{t:org,c:'#7dd3fc'}
   ];
-  // stamp font — ใช้ pixel-precise rendering
   ctx.font=`bold ${fSz}px "Courier New",monospace`;
-  ctx.textRendering='geometricPrecision';
-  ctx.textBaseline='alphabetic';
   const tw=lines.reduce((a,l)=>Math.max(a,ctx.measureText(l.t).width),0);
   const qrSz=cfg.qr&&ug?Math.round(fSz*4.5):0;
   const bh=lines.length*lh+pd*1.5;
@@ -1411,11 +1436,7 @@ function doCapture(){
   ctx.lineTo(bx,by+bh); ctx.lineTo(bx,by+rr); ctx.arcTo(bx,by,bx+rr,by,rr); ctx.closePath(); ctx.fill();
   ctx.fillStyle='#00dba4'; ctx.fillRect(bx,by+rr,Math.max(3,fSz*0.09),bh-rr);
   lines.forEach((l,i)=>{ ctx.fillStyle=l.c; ctx.fillText(l.t,bx+pd,by+pd*0.9+(i+1)*lh); });
-  // quality 0.96 = คมชัดสูงสุด ไฟล์ไม่ใหญ่เกินไป
-  const url=cv.toDataURL('image/jpeg',0.96);
-  // update stamp quality badge
-  const sqb=document.getElementById('stamp-quality');
-  if(sqb){ sqb.textContent=`${W}×${H} · Q96`; sqb.className=W>=3840?'hi':''; }
+  const url=cv.toDataURL('image/jpeg',0.92);
   const entry={id:Date.now(), dataURL:url, lat:ug?.lat??null, lng:ug?.lng??null, alt:ug?.alt??null, acc:ug?.acc??null, dt:now.toISOString(), project:cfg.project||'', uploaded:false};
   photos.unshift(entry);
   // ① บันทึกลง IDB ก่อนเลย (กันหาย)
@@ -1469,12 +1490,18 @@ async function flushPendingQueue(){
 /* ================================================================
    PHOTOS LIST
 ================================================================ */
-function getDriveImgUrl(url){
+function getDriveImgUrl(url, size){
   if(!url) return url;
-  try { const m=url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if(m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`; }
+  try {
+    const m=url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if(m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=${size||'w1600'}`;
+  }
   catch(e){}
   return url;
 }
+// grid ใช้ w400 (โหลดเร็ว), viewer ใช้ w1600 (คมชัด)
+function getDriveThumb(url){ return getDriveImgUrl(url,'w400'); }
+function getDriveView(url) { return getDriveImgUrl(url,'w1600'); }
 function renderPhotos(){
   const g=document.getElementById('pgrid');
   updCnt();
@@ -1484,11 +1511,14 @@ function renderPhotos(){
     const isLocal = !p.uploaded && p.dataURL?.startsWith('data:');
     const syncBadge=`<div class="p-sync ${p.uploaded?'ok':''}">${p.uploaded?'☁':'⏳'}</div>`;
     const localBadge=isLocal?`<div class="p-idb">IDB</div>`:'';
-    const imgSrc=p.uploaded&&p.dataURL?.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL;
+    const imgSrc=p.uploaded&&p.dataURL?.startsWith('http')?getDriveThumb(p.dataURL):p.dataURL;
     const projTag=p.project?`<div class="ppj">${p.project}</div>`:'';
     return `<div class="pc" style="animation-delay:${Math.min(i,10)*0.04}s" onclick="openV(${i})">
       ${syncBadge}${localBadge}
-      <img src="${imgSrc}" loading="lazy" alt="" onerror="this.onerror=null;this.style.opacity='0.3'">
+      <img src="${imgSrc}" loading="lazy" alt=""
+        style="opacity:0;transition:opacity .3s;"
+        onload="this.style.opacity=1"
+        onerror="this.onerror=null;this.style.opacity=0.3">
       <div class="pm"><div class="pdt">${fD(d)} ${fT(d)}</div><div class="pco">${p.lat?p.lat.toFixed(5)+', '+p.lng.toFixed(5):'ไม่มี GPS'}</div>${projTag}</div>
     </div>`;
   }).join('');
@@ -1501,8 +1531,18 @@ function openV(i){ vIdx=i; _loadViewer(i); goPg('viewer'); }
 function _loadViewer(i){
   const p=photos[i]; if(!p) return;
   const d=new Date(p.dt);
-  const src=p.uploaded&&p.dataURL?.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL;
-  document.getElementById('vimg').src=src;
+  const src=p.uploaded&&p.dataURL?.startsWith('http')?getDriveView(p.dataURL):p.dataURL;
+  const vimgEl = document.getElementById('vimg');
+  const loadingEl = document.getElementById('vimg-loading');
+  // แสดง loading เฉพาะรูป cloud (ต้องโหลด)
+  if(p.uploaded && src.includes('drive.google.com')){
+    if(loadingEl) loadingEl.style.opacity='1';
+    vimgEl.onload = ()=>{ if(loadingEl) loadingEl.style.opacity='0'; };
+    vimgEl.onerror = ()=>{ if(loadingEl) loadingEl.style.opacity='0'; };
+  } else {
+    if(loadingEl) loadingEl.style.opacity='0';
+  }
+  vimgEl.src=src;
   document.getElementById('vtit').textContent=`ภาพ ${i+1}/${photos.length}`;
   document.getElementById('vilat').textContent=p.lat?p.lat.toFixed(7)+'°':'ไม่มีข้อมูล';
   document.getElementById('vilng').textContent=p.lng?p.lng.toFixed(7)+'°':'ไม่มีข้อมูล';
@@ -1511,26 +1551,15 @@ function _loadViewer(i){
   document.getElementById('vitm').textContent=fT(d);
   document.getElementById('vidt').textContent=fD(d);
   document.getElementById('viproj').textContent=p.project||'-';
+  const vpt=document.getElementById('v-proj-tag');
+  if(vpt){ vpt.textContent=p.project?'📋 '+p.project:''; vpt.style.display=p.project?'':'none'; }
   const btn=document.getElementById('btn-upcloud');
   if(p.uploaded){ btn.textContent='✅ อัปโหลดแล้ว'; btn.disabled=true; }
   else { btn.textContent='☁️ อัปโหลด'; btn.disabled=false; }
   document.getElementById('v-prev').disabled=i<=0;
   document.getElementById('v-next').disabled=i>=photos.length-1;
 }
-function navViewer(dir){
-  // นำทางภายใน filtered list (ถ้ากำลัง filter อยู่)
-  const list = getFilteredPhotos();
-  const curInList = list.indexOf(photos[vIdx]);
-  if(curInList === -1){
-    // ไม่ได้ filter หรือรูปนี้ไม่ใน filter → นำทางใน photos[] ทั้งหมด
-    const ni=vIdx+dir; if(ni<0||ni>=photos.length)return; vIdx=ni; _loadViewer(ni); return;
-  }
-  const nextInList = curInList + dir;
-  if(nextInList < 0 || nextInList >= list.length) return;
-  const realIdx = photos.indexOf(list[nextInList]);
-  if(realIdx < 0) return;
-  vIdx = realIdx; _loadViewer(realIdx);
-}
+function navViewer(dir){ const ni=vIdx+dir; if(ni<0||ni>=photos.length)return; vIdx=ni; _loadViewer(ni); }
 let _vt0=null,_vx0=null;
 document.getElementById('vwrap')?.addEventListener('touchstart',e=>{ if(e.touches.length===1){ _vt0=Date.now(); _vx0=e.touches[0].clientX; } },{passive:true});
 document.getElementById('vwrap')?.addEventListener('touchend',e=>{ if(_vx0===null)return; const dx=e.changedTouches[0].clientX-_vx0,dt=Date.now()-_vt0; if(Math.abs(dx)>50&&dt<400) navViewer(dx<0?1:-1); _vx0=null; },{passive:true});
@@ -1739,7 +1768,7 @@ function getProjColor(proj){
   if(!_projColorMap[proj]){const k=Object.keys(_projColorMap);_projColorMap[proj]=PROJ_COLORS[k.length%PROJ_COLORS.length];}
   return _projColorMap[proj];
 }
-function getImgSrc(p){return p.uploaded&&p.dataURL?.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL;}
+function getImgSrc(p){return p.uploaded&&p.dataURL?.startsWith('http')?getDriveThumb(p.dataURL):p.dataURL;}
 function renderPopupInto(el,group,idx){
   const item=group[idx],p=item.p,d=new Date(p.dt),count=group.length,imgSrc=getImgSrc(p),projColor=getProjColor(p.project);
   let html='';
@@ -1835,21 +1864,10 @@ window.addEventListener('offline', ()=>{
 ================================================================ */
 window.addEventListener('load', async ()=>{
   await openDB();
-  // Splash fallback: ถ้า GAS ไม่ตอบใน 12 วินาที ใช้ IDB แทน
-  const _splashTimeout = setTimeout(async ()=>{
-    if(document.getElementById('splash').style.display !== 'none'){
-      toast('เชื่อมต่อช้า — ใช้ข้อมูลในเครื่อง','bad');
-      await loadFromIDB();
-      document.getElementById('splash').style.display='none';
-      finishInit();
-    }
-  }, 12000);
-  window._splashTimeout = _splashTimeout;
   loadDataFromCloud();
 });
 function finishInit(){
   loadSettingsUI(); startCam('environment'); startGPS(); startClock(); updCnt();
-  renderQuickProjBar();
   setTimeout(()=>openProjModal(true), 600);
   // retry queue เมื่อเริ่มแอปและออนไลน์
   if(navigator.onLine){ flushDeleteQueue(); processQueue(); }
