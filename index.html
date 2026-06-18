@@ -1186,11 +1186,11 @@ function startTimerOrCapture(){
 }
 
 /* ================================================================
-   CAPTURE  — Responsive Stamp + 3×3 Mini-Map  (v6)
-   แก้ไข:
-   - fSz อิง short side เสมอ → ขนาด stamp คงที่ ไม่ว่าจะหันกล้องไง
-   - mini-map โหลด 3×3 tiles stitch → crop จากกลาง → ไม่ขาด/ไม่ว่าง
-   - mapSz อิง short side → สัดส่วนดีทั้ง portrait และ landscape
+   CAPTURE  — Responsive Stamp + 3×3 Mini-Map  (v7)
+   Layout:
+   PORTRAIT  → stamp ล่างซ้าย 2 แถว │ map ขวาล่าง (เหนือ stamp)
+   LANDSCAPE → stamp ล่างซ้าย 2 แถว │ map ล่างขวา SIDE-BY-SIDE
+               stamp กว้างเต็ม (W - mapSz - gap)
 ================================================================ */
 function doCapture(){
   const v=document.getElementById('video');
@@ -1207,44 +1207,62 @@ function doCapture(){
   const ug=bestGps||gps;
   const now=new Date();
 
-  // ── ขนาด font อิง SHORT SIDE เสมอ (ไม่เปลี่ยนเมื่อหมุนกล้อง) ──
-  const shortSide = Math.min(W, H);
+  // ── font/size อิง SHORT SIDE → เท่ากันทั้ง 2 orientation ─────
+  const shortSide   = Math.min(W, H);
   const isLandscape = W > H;
-  // landscape: stamp อยู่ด้านล่างของภาพที่กว้าง → ลด fSz ลงนิด
-  const fSz = Math.round(shortSide * (isLandscape ? 0.030 : 0.028));
+  const fSz = Math.round(shortSide * 0.030);
   const lh  = fSz * 1.72;
   const pad = fSz * 1.0;
   const proj = cfg.project||'';
   const org  = 'ทต.บ้านยาง จ.ชัยภูมิ';
 
+  // mapSz อิง short side
+  const mapSz  = Math.round(shortSide * (isLandscape ? 0.32 : 0.28));
+  const margin = Math.round(shortSide * 0.008);
+
+  // stampH คงที่ 2 แถว
+  const stampH = lh * 2 + pad * 1.1;
+  const rr     = fSz * 0.35;
+
+  // แถวข้อมูล
   ctx.font = `bold ${fSz}px "Courier New",monospace`;
 
-  // แถว 1: LAT | LNG | ALT | ACC
   const row1_parts = ug
-    ? [{t:'LAT ',c:'#94a3b8'},{t:ug.lat.toFixed(6)+'°',c:'#ffffff'},
-       {t:'   LNG ',c:'#94a3b8'},{t:ug.lng.toFixed(6)+'°',c:'#ffffff'},
+    ? [{t:'LAT ',c:'#94a3b8'},{t:ug.lat.toFixed(6)+'\u00b0',c:'#ffffff'},
+       {t:'   LNG ',c:'#94a3b8'},{t:ug.lng.toFixed(6)+'\u00b0',c:'#ffffff'},
        {t:'   ALT ',c:'#94a3b8'},{t:ug.alt?ug.alt.toFixed(1)+'m':'--',c:'#e2e8f0'},
-       {t:'   ACC ±',c:'#94a3b8'},{t:Math.round(ug.acc)+'m',
+       {t:'   ACC \u00b1',c:'#94a3b8'},{t:Math.round(ug.acc)+'m',
          c:ug.acc<=15?'#00dba4':ug.acc<=30?'#84cc16':'#f5a623'}]
-    : [{t:'[ไม่มีข้อมูล GPS]',c:'#f5a623'}];
+    : [{t:'[\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 GPS]',c:'#f5a623'}];
 
-  // แถว 2: วันที่-เวลา | หน่วยงาน | โครงการ
   const row2_parts = [
     {t:`${fD(now)} ${fT(now)}`,c:'#e2e8f0'},
     ...(org?[{t:`   ${org}`,c:'#7dd3fc'}]:[]),
     ...(proj?[{t:`   ${proj}`,c:'#00dba4'}]:[])
   ];
 
-  const measureRow = parts => parts.reduce((s,{t})=>s+ctx.measureText(t).width,0);
-  const tw = Math.max(measureRow(row1_parts), measureRow(row2_parts));
+  // ── ตำแหน่ง map: ขวาล่างเสมอ ──────────────────────────────────
+  const mapX = W - mapSz - margin;
+  const mapY = H - mapSz - margin;
 
-  const stampW = tw + pad * 2.4;
-  const stampH = lh * 2 + pad * 1.1;
-  const stampX = pad * 0.4;
-  const stampY = H - stampH - pad * 0.3;
-  const rr     = fSz * 0.35;
+  // ── ตำแหน่ง stamp ──────────────────────────────────────────────
+  const stampX = margin;
+  const stampY = H - stampH - margin;
 
-  // backdrop
+  // LANDSCAPE: stamp ล่างซ้าย, map ล่างขวา, side-by-side
+  //   stampW = mapX - margin*2  (เต็มพื้นที่ซ้ายของ map)
+  // PORTRAIT:  stamp ล่างซ้าย, map ขวาล่าง (เหนือ stamp)
+  //   stampW = ตาม text width
+  let stampW;
+  if(isLandscape){
+    stampW = mapX - margin * 2;
+  } else {
+    const measureRow = parts => parts.reduce((s,{t})=>s+ctx.measureText(t).width,0);
+    const tw = Math.max(measureRow(row1_parts), measureRow(row2_parts));
+    stampW = tw + pad * 2.4;
+  }
+
+  // วาด stamp backdrop
   ctx.fillStyle='rgba(6,10,16,0.90)';
   ctx.beginPath();
   ctx.moveTo(stampX+rr,stampY); ctx.lineTo(stampX+stampW-rr,stampY);
@@ -1257,146 +1275,129 @@ function doCapture(){
 
   // accent line ซ้าย
   ctx.fillStyle='#00dba4';
-  ctx.fillRect(stampX, stampY+rr, Math.max(3,fSz*0.1), stampH-rr);
+  ctx.fillRect(stampX, stampY+rr, Math.max(3,fSz*0.10), stampH-rr);
 
   const tx0 = stampX + pad;
 
-  // วาดแถว 1
+  // วาดแถว 1 + 2 (clip ใน stampW)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(stampX, stampY, stampW, stampH); ctx.clip();
+
   ctx.font=`bold ${fSz}px "Courier New",monospace`;
-  let cx=tx0, y1=stampY+pad*0.65+lh*0.88;
+  let cx=tx0, y1=stampY+pad*0.60+lh*0.88;
   row1_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx,y1); cx+=ctx.measureText(t).width; });
 
-  // วาดแถว 2
   ctx.font=`${fSz}px "Courier New",monospace`;
-  let cx2=tx0, y2=stampY+pad*0.65+lh*1.98;
+  let cx2=tx0, y2=stampY+pad*0.60+lh*1.98;
   row2_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx2,y2); cx2+=ctx.measureText(t).width; });
 
-  // ── MINI-MAP ──────────────────────────────────────────────────
+  ctx.restore();
+
+  // mini-map
   if(ug){
-    _drawMiniMap(ctx,ug,W,H,fSz,stampH,pad,shortSide).then(()=>_finishCapture(cv,ug,now));
+    _drawMiniMap(ctx,ug,fSz,mapSz,mapX,mapY).then(()=>_finishCapture(cv,ug,now));
   } else {
     _finishCapture(cv,ug,now);
   }
 }
-
-/* ── MINI-MAP: โหลด 3×3 tile grid → stitch → crop กลาง ────────
-   ทำให้จุดอยู่กลางแผนที่เสมอ ไม่ว่าจุดจะอยู่มุมไหนของ tile    */
-async function _drawMiniMap(ctx, ug, W, H, fSz, stampH, pad, shortSide){
-  // mapSz อิง short side → สัดส่วนเท่ากันทั้ง portrait/landscape
-  const mapSz = Math.round(shortSide * 0.28);   // 28% ของด้านสั้น
+/* ── MINI-MAP: 3×3 tile stitch → crop กลาง → จุดอยู่กลางเสมอ ──
+   รับ mapX, mapY จาก doCapture แล้ว → layout ถูกต้องทั้ง 2 แนว */
+async function _drawMiniMap(ctx, ug, fSz, mapSz, mapX, mapY){
   const zoom  = 15;
-  const TILE  = 256;                             // pixel ต่อ tile
+  const TILE  = 256;
   const lat=ug.lat, lng=ug.lng;
   const n = Math.pow(2, zoom);
 
-  // tile กลาง (ที่จุดอยู่)
   const tileX  = Math.floor((lng+180)/360*n);
   const latRad = lat*Math.PI/180;
   const tileY  = Math.floor((1 - Math.log(Math.tan(latRad)+1/Math.cos(latRad))/Math.PI)/2*n);
 
-  // pixel offset ของจุดภายใน tile กลาง (0–255)
+  // pixel offset ของจุดในไทล์กลาง
   const xFrac = (lng+180)/360*n - tileX;
   const yFrac = (1 - Math.log(Math.tan(latRad)+1/Math.cos(latRad))/Math.PI)/2*n - tileY;
-  const dotX  = Math.round(xFrac * TILE);   // 0–255 ใน tile กลาง
+  const dotX  = Math.round(xFrac * TILE);
   const dotY  = Math.round(yFrac * TILE);
 
-  // ── สร้าง canvas 3×3 tiles = 768×768 ──────────────────────────
-  const GRID = 3;
-  const canvSz = TILE * GRID;   // 768
-  const tc  = document.createElement('canvas');
-  tc.width  = canvSz; tc.height = canvSz;
-  const tx  = tc.getContext('2d');
-
-  // fill background
+  // canvas 3×3 tiles = 768×768
+  const canvSz = TILE * 3;
+  const tc = document.createElement('canvas');
+  tc.width = canvSz; tc.height = canvSz;
+  const tx = tc.getContext('2d');
   tx.fillStyle='#1e2d3d'; tx.fillRect(0,0,canvSz,canvSz);
 
-  // โหลด tile 3×3 แบบ parallel
+  // โหลด 9 tiles แบบ parallel
   const servers = ['a','b','c'];
-  const loads   = [];
-  for(let dy = -1; dy <= 1; dy++){
-    for(let dx = -1; dx <= 1; dx++){
-      const tx_ = tileX + dx;
-      const ty_ = tileY + dy;
-      const px  = (dx+1) * TILE;   // ตำแหน่งใน canvas 768
-      const py  = (dy+1) * TILE;
+  const loads = [];
+  for(let dy=-1; dy<=1; dy++){
+    for(let dx=-1; dx<=1; dx++){
+      const txN = tileX+dx, tyN = tileY+dy;
+      const px  = (dx+1)*TILE, py = (dy+1)*TILE;
       const s   = servers[Math.floor(Math.random()*3)];
-      const url = `https://${s}.tile.openstreetmap.org/${zoom}/${tx_}/${ty_}.png`;
       loads.push(new Promise(res=>{
         const img = new Image(); img.crossOrigin='anonymous';
-        img.onload  = ()=>{ tx.drawImage(img, px, py, TILE, TILE); res(); };
-        img.onerror = ()=>res();  // ไม่วาดถ้าโหลดไม่ได้
-        img.src = url;
-        setTimeout(res, 4000);    // timeout 4s
+        img.onload  = ()=>{ tx.drawImage(img,px,py,TILE,TILE); res(); };
+        img.onerror = ()=>res();
+        img.src = `https://${s}.tile.openstreetmap.org/${zoom}/${txN}/${tyN}.png`;
+        setTimeout(res, 4500);
       }));
     }
   }
   await Promise.all(loads);
 
-  // จุดศูนย์กลางของจุดใน canvas 768×768
-  // tile กลางคือ offset (TILE, TILE) → จุดอยู่ที่ (TILE+dotX, TILE+dotY)
+  // จุดศูนย์กลางใน canvas 768 = tile กลาง offset + dotX/dotY
   const centerX = TILE + dotX;
   const centerY = TILE + dotY;
 
-  // วาด crosshair + dot บน canvas 768
-  const chLen = Math.round(mapSz * 0.08);    // ความยาว crosshair ตาม mapSz
-  const dotR  = Math.round(mapSz * 0.025);   // รัศมี dot
-  const lw    = Math.max(2, Math.round(mapSz * 0.006));
+  // crosshair + dot (ขนาดตาม mapSz)
+  const chLen = Math.round(mapSz * 0.09);
+  const dotR  = Math.round(mapSz * 0.028);
+  const lw    = Math.max(2, Math.round(mapSz * 0.007));
 
-  // เส้น crosshair สีแดง
-  tx.strokeStyle='rgba(220,30,30,0.95)'; tx.lineWidth=lw+1;
+  tx.strokeStyle='rgba(220,30,30,0.95)'; tx.lineWidth=lw+2;
   tx.beginPath();
-  tx.moveTo(centerX-chLen, centerY); tx.lineTo(centerX+chLen, centerY);
-  tx.moveTo(centerX, centerY-chLen); tx.lineTo(centerX, centerY+chLen);
+  tx.moveTo(centerX-chLen,centerY); tx.lineTo(centerX+chLen,centerY);
+  tx.moveTo(centerX,centerY-chLen); tx.lineTo(centerX,centerY+chLen);
   tx.stroke();
-  // เส้น crosshair สีขาว (얇er ด้านใน)
-  tx.strokeStyle='rgba(255,255,255,0.7)'; tx.lineWidth=lw;
+  tx.strokeStyle='rgba(255,255,255,0.75)'; tx.lineWidth=lw;
   tx.beginPath();
-  tx.moveTo(centerX-chLen, centerY); tx.lineTo(centerX+chLen, centerY);
-  tx.moveTo(centerX, centerY-chLen); tx.lineTo(centerX, centerY+chLen);
+  tx.moveTo(centerX-chLen,centerY); tx.lineTo(centerX+chLen,centerY);
+  tx.moveTo(centerX,centerY-chLen); tx.lineTo(centerX,centerY+chLen);
   tx.stroke();
-  // dot แดง
-  tx.beginPath(); tx.arc(centerX, centerY, dotR, 0, Math.PI*2);
+
+  tx.beginPath(); tx.arc(centerX,centerY,dotR,0,Math.PI*2);
   tx.fillStyle='rgba(255,35,35,0.97)'; tx.fill();
-  tx.strokeStyle='rgba(255,255,255,0.9)'; tx.lineWidth=Math.max(1.5, lw);
-  tx.stroke();
-  // วงกลมโปร่งรอบ dot
-  tx.beginPath(); tx.arc(centerX, centerY, dotR*2.5, 0, Math.PI*2);
-  tx.strokeStyle='rgba(255,60,60,0.45)'; tx.lineWidth=lw;
+  tx.strokeStyle='rgba(255,255,255,0.92)'; tx.lineWidth=Math.max(2,lw);
   tx.stroke();
 
-  // ── crop: ตัด mapSz×mapSz โดยให้ centerX/Y อยู่กลาง ──────────
+  tx.beginPath(); tx.arc(centerX,centerY,dotR*2.8,0,Math.PI*2);
+  tx.strokeStyle='rgba(255,60,60,0.38)'; tx.lineWidth=lw;
+  tx.stroke();
+
+  // crop: centerX/Y อยู่กลาง mapSz
   let cropX = Math.round(centerX - mapSz/2);
   let cropY  = Math.round(centerY - mapSz/2);
-  // clamp ให้อยู่ใน canvas 768
   cropX = Math.max(0, Math.min(canvSz - mapSz, cropX));
   cropY = Math.max(0, Math.min(canvSz - mapSz, cropY));
 
-  // ── วางลงบน canvas หลัก: ขวาล่าง เหนือ stamp ─────────────────
-  const margin = Math.round(W * 0.006);
-  const mx = W - mapSz - margin;
-  const my = H - stampH - mapSz - margin - Math.round(pad*0.3);
-
-  // shadow + border เขียว
-  const bw = Math.max(3, Math.round(fSz * 0.1));
-  ctx.shadowColor='rgba(0,0,0,0.85)'; ctx.shadowBlur=16;
-  ctx.strokeStyle='rgba(0,229,176,0.9)'; ctx.lineWidth=bw;
-  ctx.strokeRect(mx - bw/2, my - bw/2, mapSz + bw, mapSz + bw);
+  // border เขียว + shadow
+  const bw = Math.max(3, Math.round(fSz*0.10));
+  ctx.shadowColor='rgba(0,0,0,0.88)'; ctx.shadowBlur=18;
+  ctx.strokeStyle='rgba(0,229,176,0.92)'; ctx.lineWidth=bw;
+  ctx.strokeRect(mapX-bw/2, mapY-bw/2, mapSz+bw, mapSz+bw);
   ctx.shadowBlur=0;
 
-  // วาด tile ที่ crop แล้ว — เต็มกรอบเสมอ
-  ctx.drawImage(tc, cropX, cropY, mapSz, mapSz, mx, my, mapSz, mapSz);
+  // วาด tile ที่ crop → เต็มกรอบ mapSz×mapSz
+  ctx.drawImage(tc, cropX, cropY, mapSz, mapSz, mapX, mapY, mapSz, mapSz);
 
-  // label แถบล่าง map
-  const lbSz = Math.round(fSz * 0.70);
-  ctx.font = `bold ${lbSz}px "Courier New",monospace`;
-  ctx.fillStyle = 'rgba(6,10,16,0.82)';
-  ctx.fillRect(mx, my + mapSz - lbSz*1.8, mapSz, lbSz*1.9);
-  ctx.fillStyle = '#00dba4';
-  ctx.textAlign = 'right';
-  ctx.fillText(`z${zoom} \u00b7 OSM`, mx + mapSz - Math.round(fSz*0.3), my + mapSz - Math.round(lbSz*0.25));
-  ctx.textAlign = 'left';
+  // label แถบล่าง
+  const lbSz = Math.round(fSz*0.68);
+  ctx.font=`bold ${lbSz}px "Courier New",monospace`;
+  ctx.fillStyle='rgba(6,10,16,0.85)';
+  ctx.fillRect(mapX, mapY+mapSz-lbSz*1.85, mapSz, lbSz*1.9);
+  ctx.fillStyle='#00dba4'; ctx.textAlign='right';
+  ctx.fillText(`z${zoom} · OSM`, mapX+mapSz-Math.round(fSz*0.3), mapY+mapSz-Math.round(lbSz*0.28));
+  ctx.textAlign='left';
 }
-
 /* เสร็จสิ้น: บันทึก entry + เข้า upload queue */
 function _finishCapture(cv, ug, now){
   const url=cv.toDataURL('image/jpeg',0.92);
