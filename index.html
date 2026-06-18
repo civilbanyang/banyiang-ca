@@ -1197,11 +1197,17 @@ function startTimerOrCapture(){
 }
 
 /* ================================================================
-   CAPTURE  — Responsive Stamp + 3×3 Mini-Map  (v7)
-   Layout:
-   PORTRAIT  → stamp ล่างซ้าย 2 แถว │ map ขวาล่าง (เหนือ stamp)
-   LANDSCAPE → stamp ล่างซ้าย 2 แถว │ map ล่างขวา SIDE-BY-SIDE
-               stamp กว้างเต็ม (W - mapSz - gap)
+   CAPTURE  — Auto-rotate canvas + Responsive Layout  (v9)
+
+   ปัญหาจริง: กล้องมือถือส่ง video เป็น portrait (W<H) เสมอ
+   แม้ถ่ายแนวนอน → ต้องดู screen.orientation.angle
+   แล้ว rotate canvas เพื่อให้รูปออกมาถูกทิศ
+
+   Layout หลัง rotate:
+   LANDSCAPE (angle 90/270) → canvas = H_orig × W_orig
+     stamp ซ้ายล่าง │ map ขวาล่าง  (side-by-side)
+   PORTRAIT  (angle 0/180)  → canvas = W_orig × H_orig
+     map ขวา (เหนือ stamp)  │ stamp ล่างซ้าย
 ================================================================ */
 function doCapture(){
   const v=document.getElementById('video');
@@ -1209,36 +1215,55 @@ function doCapture(){
   const bs=document.getElementById('bshut');
   bs.classList.add('fl'); document.getElementById('flash').classList.add('on');
   setTimeout(()=>{ document.getElementById('flash').classList.remove('on'); bs.classList.remove('fl'); },140);
-  const W=v.videoWidth, H=v.videoHeight;
-  const cv=document.getElementById('cvs'); cv.width=W; cv.height=H;
+
+  // ── ตรวจ orientation จริงของหน้าจอ ──────────────────────────
+  const angle = (screen.orientation?.angle ?? window.orientation ?? 0);
+  const isLandscape = Math.abs(angle) === 90 || Math.abs(angle) === 270;
+
+  const vW = v.videoWidth, vH = v.videoHeight;   // ขนาด video จริง (เสมอ portrait)
+
+  // ── ขนาด canvas หลัง rotate ────────────────────────────────
+  // landscape: หมุน 90° → canvas กว้าง=vH, สูง=vW
+  // portrait:  ไม่หมุน  → canvas กว้าง=vW, สูง=vH
+  const W = isLandscape ? vH : vW;
+  const H = isLandscape ? vW : vH;
+
+  const cv=document.getElementById('cvs');
+  cv.width=W; cv.height=H;
   const ctx=cv.getContext('2d');
-  if(facing==='user'){ ctx.translate(W,0); ctx.scale(-1,1); }
-  ctx.drawImage(v,0,0,W,H);
-  if(facing==='user') ctx.setTransform(1,0,0,1,0,0);
+
+  // ── วาด video ลง canvas (พร้อม rotate ถ้า landscape) ────────
+  ctx.save();
+  if(isLandscape){
+    // หมุน canvas 90° (clockwise สำหรับ angle=90, CCW สำหรับ angle=270)
+    const dir = angle === 270 || angle === -90 ? -1 : 1;
+    ctx.translate(W/2, H/2);
+    ctx.rotate(dir * Math.PI/2);
+    // หลัง rotate 90°: วาดบน coordinate เดิม (vW×vH) แล้ว center
+    if(facing==='user') ctx.scale(-1,1);
+    ctx.drawImage(v, -vW/2, -vH/2, vW, vH);
+  } else {
+    if(facing==='user'){ ctx.translate(W,0); ctx.scale(-1,1); }
+    ctx.drawImage(v, 0, 0, W, H);
+  }
+  ctx.restore();
+
   const ug=bestGps||gps;
   const now=new Date();
 
-  // ── font/size อิง SHORT SIDE → เท่ากันทั้ง 2 orientation ─────
-  const shortSide   = Math.min(W, H);
-  const isLandscape = W > H;
-  const fSz = Math.round(shortSide * 0.030);
-  const lh  = fSz * 1.72;
-  const pad = fSz * 1.0;
-  const proj = cfg.project||'';
-  const org  = 'ทต.บ้านยาง จ.ชัยภูมิ';
+  // ── ขนาด font/map อิง short side ────────────────────────────
+  const shortSide = Math.min(W, H);
+  const fSz   = Math.round(shortSide * 0.030);
+  const lh    = fSz * 1.72;
+  const pad   = fSz * 1.0;
+  const margin= Math.round(shortSide * 0.008);
+  const proj  = cfg.project||'';
+  const org   = 'ทต.บ้านยาง จ.ชัยภูมิ';
+  const mapSz = Math.round(shortSide * (isLandscape ? 0.30 : 0.27));
 
-  // mapSz อิง short side
-  const mapSz  = Math.round(shortSide * (isLandscape ? 0.32 : 0.28));
-  const margin = Math.round(shortSide * 0.008);
-
-  // stampH คงที่ 2 แถว
-  const stampH = lh * 2 + pad * 1.1;
-  const rr     = fSz * 0.35;
-
-  // แถวข้อมูล
+  // ── แถวข้อมูล ─────────────────────────────────────────────────
   ctx.font = `bold ${fSz}px "Courier New",monospace`;
 
-  // ── แถวข้อมูล (adaptive: 2 หรือ 3 แถว) ──────────────────────────
   const row1_parts = ug
     ? [{t:'LAT ',c:'#94a3b8'},{t:ug.lat.toFixed(6)+'°',c:'#ffffff'},
        {t:'   LNG ',c:'#94a3b8'},{t:ug.lng.toFixed(6)+'°',c:'#ffffff'},
@@ -1247,88 +1272,84 @@ function doCapture(){
          c:ug.acc<=15?'#00dba4':ug.acc<=30?'#84cc16':'#f5a623'}]
     : [{t:'[ไม่มีข้อมูล GPS]',c:'#f5a623'}];
 
-  // แถว 2: วันที่-เวลา + หน่วยงาน
   const row2_parts = [
     {t:`${fD(now)} ${fT(now)}`,c:'#e2e8f0'},
     ...(org?[{t:`   ${org}`,c:'#7dd3fc'}]:[])
   ];
-  // แถว 3: โครงการ (แยกบรรทัดเสมอ — ไม่ล้นออกไป)
+
   const row3_parts = proj
-    ? [{t:'📋 ',c:'#4a5a70'},{t:proj,c:'#00dba4'}]
+    ? [{t:'● ',c:'#00dba4'},{t:proj,c:'#00dba4'}]
     : null;
 
-  const measureRow = parts => parts.reduce((s,{t})=>s+ctx.measureText(t).width, 0);
   const numRows = row3_parts ? 3 : 2;
+  const stampH  = lh * numRows + pad * 1.1;
+  const rr      = fSz * 0.35;
 
-  // ── ตำแหน่ง map: ขวาล่างเสมอ ──────────────────────────────────
-  const mapX = W - mapSz - margin;
-  const mapY = H - mapSz - margin;
+  // ── Layout stamp + map (ไม่ทับกัน) ──────────────────────────
+  let stampX, stampY, stampW, mapX, mapY;
 
-  // ── ตำแหน่ง stamp ──────────────────────────────────────────────
-  // stampH ปรับตามจำนวนแถว
-  const stampH_actual = lh * numRows + pad * 1.1;
-  const stampX = margin;
-  const stampY = H - stampH_actual - margin;
-  const rr_actual = fSz * 0.35;
-
-  // stampW: landscape → เต็มพื้นที่ซ้ายของ map
-  //         portrait  → ตาม text กว้างสุด
-  let stampW;
   if(isLandscape){
-    stampW = mapX - margin * 2;
+    // LANDSCAPE: side-by-side ล่างสุด
+    mapX   = W - mapSz - margin;
+    mapY   = H - mapSz - margin;       // map ชิดล่าง
+    stampX = margin;
+    stampY = H - stampH - margin;      // stamp ชิดล่าง
+    stampW = mapX - margin * 2;        // กว้างถึงขอบ map
   } else {
-    const tw = Math.max(measureRow(row1_parts), measureRow(row2_parts),
-                        row3_parts ? measureRow(row3_parts) : 0);
-    stampW = Math.min(tw + pad * 2.4, W - mapSz - margin * 3);
+    // PORTRAIT: map เหนือ stamp (ขวา)
+    const mR = p => p.reduce((s,{t})=>s+ctx.measureText(t).width,0);
+    const tw = Math.max(
+      mR(row1_parts), mR(row2_parts),
+      row3_parts ? mR(row3_parts) : 0
+    );
+    stampW = Math.min(tw + pad*2.4, W - margin*2);
+    stampX = margin;
+    stampY = H - stampH - margin;
+    mapX   = W - mapSz - margin;
+    mapY   = stampY - mapSz - margin;  // เหนือ stamp ไม่ทับ
   }
 
-  // วาด stamp backdrop
+  // ── วาด stamp backdrop ────────────────────────────────────────
   ctx.fillStyle='rgba(6,10,16,0.90)';
   ctx.beginPath();
-  ctx.moveTo(stampX+rr_actual,stampY); ctx.lineTo(stampX+stampW-rr_actual,stampY);
-  ctx.arcTo(stampX+stampW,stampY,stampX+stampW,stampY+rr_actual,rr_actual);
-  ctx.lineTo(stampX+stampW,stampY+stampH_actual);
-  ctx.lineTo(stampX,stampY+stampH_actual);
-  ctx.lineTo(stampX,stampY+rr_actual);
-  ctx.arcTo(stampX,stampY,stampX+rr_actual,stampY,rr_actual);
+  ctx.moveTo(stampX+rr,stampY); ctx.lineTo(stampX+stampW-rr,stampY);
+  ctx.arcTo(stampX+stampW,stampY,stampX+stampW,stampY+rr,rr);
+  ctx.lineTo(stampX+stampW,stampY+stampH);
+  ctx.lineTo(stampX,stampY+stampH);
+  ctx.lineTo(stampX,stampY+rr);
+  ctx.arcTo(stampX,stampY,stampX+rr,stampY,rr);
   ctx.closePath(); ctx.fill();
 
-  // accent line ซ้าย
   ctx.fillStyle='#00dba4';
-  ctx.fillRect(stampX, stampY+rr_actual, Math.max(3,fSz*0.10), stampH_actual-rr_actual);
+  ctx.fillRect(stampX, stampY+rr, Math.max(3,fSz*0.10), stampH-rr);
 
-  const tx0 = stampX + pad;
-
-  // วาดทุกแถว (clip ใน stampW)
+  // ── วาดข้อความ (clip) ────────────────────────────────────────
   ctx.save();
-  ctx.beginPath(); ctx.rect(stampX, stampY, stampW, stampH_actual); ctx.clip();
+  ctx.beginPath(); ctx.rect(stampX,stampY,stampW,stampH); ctx.clip();
 
-  // แถว 1: GPS
   ctx.font=`bold ${fSz}px "Courier New",monospace`;
-  let cx=tx0, y1=stampY+pad*0.55+lh*0.88;
+  let cx=stampX+pad, y1=stampY+pad*0.55+lh*0.88;
   row1_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx,y1); cx+=ctx.measureText(t).width; });
 
-  // แถว 2: วันที่-เวลา + หน่วยงาน
   ctx.font=`${fSz}px "Courier New",monospace`;
-  let cx2=tx0, y2=stampY+pad*0.55+lh*1.95;
+  let cx2=stampX+pad, y2=stampY+pad*0.55+lh*1.95;
   row2_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx2,y2); cx2+=ctx.measureText(t).width; });
 
-  // แถว 3: โครงการ (ถ้ามี)
   if(row3_parts){
     ctx.font=`bold ${fSz}px "Courier New",monospace`;
-    let cx3=tx0, y3=stampY+pad*0.55+lh*2.95;
+    let cx3=stampX+pad, y3=stampY+pad*0.55+lh*2.95;
     row3_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx3,y3); cx3+=ctx.measureText(t).width; });
   }
-
   ctx.restore();
 
-  // mini-map
+  // ── MINI-MAP ──────────────────────────────────────────────────
   if(ug){
     _drawMiniMap(ctx,ug,fSz,mapSz,mapX,mapY).then(()=>_finishCapture(cv,ug,now));
   } else {
     _finishCapture(cv,ug,now);
   }
 }
+
 /* ── MINI-MAP: 3×3 tile stitch → crop กลาง → จุดอยู่กลางเสมอ ──
    รับ mapX, mapY จาก doCapture แล้ว → layout ถูกต้องทั้ง 2 แนว */
 async function _drawMiniMap(ctx, ug, fSz, mapSz, mapX, mapY){
