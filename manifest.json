@@ -1,7 +1,7 @@
 {
   "name": "SurveyCAM",
   "short_name": "SurveyCAM",
-  "description": "กล้องสำรวจ, Offline Map",
+  "description": "กล้องสำรวจพร้อม GPS Stamp + Mini-Map, Offline Ready",
   "start_url": "https://civilbanyang.github.io/banyiang-ca/",
   "scope": "https://civilbanyang.github.io/banyiang-ca/",
   "display": "standalone",
