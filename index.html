@@ -1197,17 +1197,18 @@ function startTimerOrCapture(){
 }
 
 /* ================================================================
-   CAPTURE  — Auto-rotate canvas + Responsive Layout  (v9)
+   CAPTURE  — Simple & Bulletproof Layout  (v10)
 
-   ปัญหาจริง: กล้องมือถือส่ง video เป็น portrait (W<H) เสมอ
-   แม้ถ่ายแนวนอน → ต้องดู screen.orientation.angle
-   แล้ว rotate canvas เพื่อให้รูปออกมาถูกทิศ
+   ตัดการตรวจ screen.orientation ทิ้งทั้งหมด (ไม่เสถียรข้ามอุปกรณ์)
+   ใช้แค่ W,H ของ canvas จริงหลังถ่ายภาพ (เชื่อถือได้เสมอ)
 
-   Layout หลัง rotate:
-   LANDSCAPE (angle 90/270) → canvas = H_orig × W_orig
-     stamp ซ้ายล่าง │ map ขวาล่าง  (side-by-side)
-   PORTRAIT  (angle 0/180)  → canvas = W_orig × H_orig
-     map ขวา (เหนือ stamp)  │ stamp ล่างซ้าย
+   กติกาเดียว ไม่มีทางทับกัน:
+   - W >= H (กว้างกว่าหรือเท่ากัน) → ถือว่าเป็น "แนวกว้าง"
+     stamp ซ้ายล่าง + map ขวาล่าง วางข้างกัน (ห้ามเกิน mapX)
+   - W <  H (สูงกว่า)              → ถือว่าเป็น "แนวสูง"
+     map ขวาบน + stamp ล่างเต็มความกว้าง วางซ้อนกัน (ห้ามเกิน stampY)
+
+   ทุกค่าระยะคำนวณจาก W,H จริงของ canvas เท่านั้น ไม่อิงอุปกรณ์ภายนอก
 ================================================================ */
 function doCapture(){
   const v=document.getElementById('video');
@@ -1216,50 +1217,26 @@ function doCapture(){
   bs.classList.add('fl'); document.getElementById('flash').classList.add('on');
   setTimeout(()=>{ document.getElementById('flash').classList.remove('on'); bs.classList.remove('fl'); },140);
 
-  // ── ตรวจ orientation จริงของหน้าจอ ──────────────────────────
-  const angle = (screen.orientation?.angle ?? window.orientation ?? 0);
-  const isLandscape = Math.abs(angle) === 90 || Math.abs(angle) === 270;
-
-  const vW = v.videoWidth, vH = v.videoHeight;   // ขนาด video จริง (เสมอ portrait)
-
-  // ── ขนาด canvas หลัง rotate ────────────────────────────────
-  // landscape: หมุน 90° → canvas กว้าง=vH, สูง=vW
-  // portrait:  ไม่หมุน  → canvas กว้าง=vW, สูง=vH
-  const W = isLandscape ? vH : vW;
-  const H = isLandscape ? vW : vH;
-
-  const cv=document.getElementById('cvs');
-  cv.width=W; cv.height=H;
+  const W=v.videoWidth, H=v.videoHeight;
+  const cv=document.getElementById('cvs'); cv.width=W; cv.height=H;
   const ctx=cv.getContext('2d');
-
-  // ── วาด video ลง canvas (พร้อม rotate ถ้า landscape) ────────
-  ctx.save();
-  if(isLandscape){
-    // หมุน canvas 90° (clockwise สำหรับ angle=90, CCW สำหรับ angle=270)
-    const dir = angle === 270 || angle === -90 ? -1 : 1;
-    ctx.translate(W/2, H/2);
-    ctx.rotate(dir * Math.PI/2);
-    // หลัง rotate 90°: วาดบน coordinate เดิม (vW×vH) แล้ว center
-    if(facing==='user') ctx.scale(-1,1);
-    ctx.drawImage(v, -vW/2, -vH/2, vW, vH);
-  } else {
-    if(facing==='user'){ ctx.translate(W,0); ctx.scale(-1,1); }
-    ctx.drawImage(v, 0, 0, W, H);
-  }
-  ctx.restore();
+  if(facing==='user'){ ctx.translate(W,0); ctx.scale(-1,1); }
+  ctx.drawImage(v,0,0,W,H);
+  if(facing==='user') ctx.setTransform(1,0,0,1,0,0);
 
   const ug=bestGps||gps;
   const now=new Date();
 
-  // ── ขนาด font/map อิง short side ────────────────────────────
+  // ── ขนาด font/map อิง short side ของ canvas จริง ──────────────
   const shortSide = Math.min(W, H);
+  const isWide    = W >= H;             // true = กว้าง (รวม "พอดี" ด้วย)
   const fSz   = Math.round(shortSide * 0.030);
   const lh    = fSz * 1.72;
   const pad   = fSz * 1.0;
-  const margin= Math.round(shortSide * 0.008);
+  const margin= Math.round(shortSide * 0.010);
   const proj  = cfg.project||'';
   const org   = 'ทต.บ้านยาง จ.ชัยภูมิ';
-  const mapSz = Math.round(shortSide * (isLandscape ? 0.30 : 0.27));
+  const mapSz = Math.round(shortSide * (isWide ? 0.30 : 0.27));
 
   // ── แถวข้อมูล ─────────────────────────────────────────────────
   ctx.font = `bold ${fSz}px "Courier New",monospace`;
@@ -1285,28 +1262,26 @@ function doCapture(){
   const stampH  = lh * numRows + pad * 1.1;
   const rr      = fSz * 0.35;
 
-  // ── Layout stamp + map (ไม่ทับกัน) ──────────────────────────
+  // ══════════════════════════════════════════════════════════════
+  //  LAYOUT — สูตรเดียว คำนวณจาก W,H ตรงๆ ไม่มีทางชนกัน
+  // ══════════════════════════════════════════════════════════════
   let stampX, stampY, stampW, mapX, mapY;
 
-  if(isLandscape){
-    // LANDSCAPE: side-by-side ล่างสุด
+  if(isWide){
+    // กว้าง: stamp ซ้ายล่าง + map ขวาล่าง วาง "ข้างกัน" แถวเดียว
     mapX   = W - mapSz - margin;
-    mapY   = H - mapSz - margin;       // map ชิดล่าง
-    stampX = margin;
-    stampY = H - stampH - margin;      // stamp ชิดล่าง
-    stampW = mapX - margin * 2;        // กว้างถึงขอบ map
-  } else {
-    // PORTRAIT: map เหนือ stamp (ขวา)
-    const mR = p => p.reduce((s,{t})=>s+ctx.measureText(t).width,0);
-    const tw = Math.max(
-      mR(row1_parts), mR(row2_parts),
-      row3_parts ? mR(row3_parts) : 0
-    );
-    stampW = Math.min(tw + pad*2.4, W - margin*2);
+    mapY   = H - mapSz - margin;
     stampX = margin;
     stampY = H - stampH - margin;
-    mapX   = W - mapSz - margin;
-    mapY   = stampY - mapSz - margin;  // เหนือ stamp ไม่ทับ
+    stampW = Math.max(fSz*4, mapX - margin - stampX);   // ห้ามแตะ map
+  } else {
+    // สูง: map ขวาบน + stamp ล่างเต็มความกว้าง วาง "ซ้อนกัน"
+    stampX = margin;
+    stampY = H - stampH - margin;
+    stampW = W - margin*2;                               // เต็มความกว้าง
+
+    mapX = W - mapSz - margin;
+    mapY = Math.max(margin, stampY - mapSz - margin);    // ห้ามแตะ stamp, ห้ามหลุดขอบบน
   }
 
   // ── วาด stamp backdrop ────────────────────────────────────────
@@ -1323,7 +1298,7 @@ function doCapture(){
   ctx.fillStyle='#00dba4';
   ctx.fillRect(stampX, stampY+rr, Math.max(3,fSz*0.10), stampH-rr);
 
-  // ── วาดข้อความ (clip) ────────────────────────────────────────
+  // ── วาดข้อความ (clip กัน overflow เสมอ) ───────────────────────
   ctx.save();
   ctx.beginPath(); ctx.rect(stampX,stampY,stampW,stampH); ctx.clip();
 
