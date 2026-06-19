@@ -1239,8 +1239,6 @@ function doCapture(){
   const mapSz = Math.round(shortSide * (isWide ? 0.30 : 0.27));
 
   // ── แถวข้อมูล ─────────────────────────────────────────────────
-  ctx.font = `bold ${fSz}px "Courier New",monospace`;
-
   const row1_parts = ug
     ? [{t:'LAT ',c:'#94a3b8'},{t:ug.lat.toFixed(6)+'°',c:'#ffffff'},
        {t:'   LNG ',c:'#94a3b8'},{t:ug.lng.toFixed(6)+'°',c:'#ffffff'},
@@ -1259,16 +1257,17 @@ function doCapture(){
     : null;
 
   const numRows = row3_parts ? 3 : 2;
-  const stampH  = lh * numRows + pad * 1.1;
   const rr      = fSz * 0.35;
 
   // ══════════════════════════════════════════════════════════════
   //  LAYOUT — สูตรเดียว คำนวณจาก W,H ตรงๆ ไม่มีทางชนกัน
   // ══════════════════════════════════════════════════════════════
-  let stampX, stampY, stampW, mapX, mapY;
+  let stampX, stampY, stampW, stampH, mapX, mapY;
+  const baseStampH = lh * numRows + pad * 1.1;
 
   if(isWide){
     // กว้าง: stamp ซ้ายล่าง + map ขวาล่าง วาง "ข้างกัน" แถวเดียว
+    stampH = baseStampH;
     mapX   = W - mapSz - margin;
     mapY   = H - mapSz - margin;
     stampX = margin;
@@ -1276,6 +1275,7 @@ function doCapture(){
     stampW = Math.max(fSz*4, mapX - margin - stampX);   // ห้ามแตะ map
   } else {
     // สูง: map ขวาบน + stamp ล่างเต็มความกว้าง วาง "ซ้อนกัน"
+    stampH = baseStampH;
     stampX = margin;
     stampY = H - stampH - margin;
     stampW = W - margin*2;                               // เต็มความกว้าง
@@ -1284,35 +1284,61 @@ function doCapture(){
     mapY = Math.max(margin, stampY - mapSz - margin);    // ห้ามแตะ stamp, ห้ามหลุดขอบบน
   }
 
-  // ── วาด stamp backdrop ────────────────────────────────────────
+  // ── AUTO-FIT FONT: ลด fSz ถ้า row ที่ยาวสุดล้น stampW ──────────
+  // วัดความกว้างจริงด้วย font ปัจจุบัน แล้วลดขนาดจนพอดี (กัน ACC/LNG ถูกตัด)
+  ctx.font = `bold ${fSz}px "Courier New",monospace`;
+  const measureRow = (parts, f) => { ctx.font = `bold ${f}px "Courier New",monospace`; return parts.reduce((s,{t})=>s+ctx.measureText(t).width,0); };
+  let fitFSz = fSz;
+  const availW = stampW - pad*2.2;
+  for(let tries=0; tries<12; tries++){
+    const w1 = measureRow(row1_parts, fitFSz);
+    const w2 = measureRow(row2_parts, fitFSz);
+    const w3 = row3_parts ? measureRow(row3_parts, fitFSz) : 0;
+    const maxW = Math.max(w1, w2, w3);
+    if(maxW <= availW || fitFSz <= fSz*0.55) break;
+    fitFSz = Math.max(fSz*0.55, fitFSz * (availW / maxW) * 0.97);
+  }
+  fitFSz = Math.round(fitFSz);
+
+  // คำนวณ lh/pad/stampH ใหม่ตาม fitFSz จริง (ถ้าเล็กลง stamp ก็เตี้ยลงตาม)
+  const lh2  = fitFSz * 1.72;
+  const pad2 = fitFSz * 1.0;
+  stampH = lh2 * numRows + pad2 * 1.1;
+
+  // อัปเดตตำแหน่ง Y ใหม่ตาม stampH ที่แท้จริง (กันหลุดขอบล่าง/ทับ map)
+  stampY = H - stampH - margin;
+  if(!isWide) mapY = Math.max(margin, stampY - mapSz - margin);
+
+  // ── วาด stamp backdrop (ขนาดจริงหลัง auto-fit) ──────────────
+  const rr2 = fitFSz * 0.35;
   ctx.fillStyle='rgba(6,10,16,0.90)';
   ctx.beginPath();
-  ctx.moveTo(stampX+rr,stampY); ctx.lineTo(stampX+stampW-rr,stampY);
-  ctx.arcTo(stampX+stampW,stampY,stampX+stampW,stampY+rr,rr);
+  ctx.moveTo(stampX+rr2,stampY); ctx.lineTo(stampX+stampW-rr2,stampY);
+  ctx.arcTo(stampX+stampW,stampY,stampX+stampW,stampY+rr2,rr2);
   ctx.lineTo(stampX+stampW,stampY+stampH);
   ctx.lineTo(stampX,stampY+stampH);
-  ctx.lineTo(stampX,stampY+rr);
-  ctx.arcTo(stampX,stampY,stampX+rr,stampY,rr);
+  ctx.lineTo(stampX,stampY+rr2);
+  ctx.arcTo(stampX,stampY,stampX+rr2,stampY,rr2);
   ctx.closePath(); ctx.fill();
 
   ctx.fillStyle='#00dba4';
-  ctx.fillRect(stampX, stampY+rr, Math.max(3,fSz*0.10), stampH-rr);
+  ctx.fillRect(stampX, stampY+rr2, Math.max(3,fitFSz*0.10), stampH-rr2);
 
-  // ── วาดข้อความ (clip กัน overflow เสมอ) ───────────────────────
+  // ── วาดข้อความ ด้วย fitFSz (รับประกันไม่ล้น + clip กันเหนียวอีกชั้น) ──
   ctx.save();
   ctx.beginPath(); ctx.rect(stampX,stampY,stampW,stampH); ctx.clip();
 
-  ctx.font=`bold ${fSz}px "Courier New",monospace`;
-  let cx=stampX+pad, y1=stampY+pad*0.55+lh*0.88;
+  ctx.font=`bold ${fitFSz}px "Courier New",monospace`;
+  let cx=stampX+pad2, y1=stampY+pad2*0.55+lh2*0.88;
   row1_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx,y1); cx+=ctx.measureText(t).width; });
 
-  ctx.font=`${fSz}px "Courier New",monospace`;
-  let cx2=stampX+pad, y2=stampY+pad*0.55+lh*1.95;
+  ctx.font=`${fitFSz}px "Courier New",monospace`;
+  let cx2=stampX+pad2, y2=stampY+pad2*0.55+lh2*1.95;
   row2_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx2,y2); cx2+=ctx.measureText(t).width; });
 
   if(row3_parts){
-    ctx.font=`bold ${fSz}px "Courier New",monospace`;
-    let cx3=stampX+pad, y3=stampY+pad*0.55+lh*2.95;
+    ctx.font=`bold ${fitFSz}px "Courier New",monospace`;
+    let cx3=stampX+pad2, y3=stampY+pad2*0.55+lh2*2.95;
     row3_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx3,y3); cx3+=ctx.measureText(t).width; });
   }
   ctx.restore();
