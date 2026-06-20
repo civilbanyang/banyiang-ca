@@ -456,7 +456,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
         </div>
         <div id="proj-set-list"></div>
         <div style="display:flex;gap:7px;margin-top:8px;padding:0 2px 4px;">
-          <input id="proj-set-inp" type="text" placeholder="เพิ่มโครงการใหม่..."
+          <input id="proj-set-inp" type="text" placeholder="เพิ่มโครงการใหม่..." maxlength="60"
             style="flex:1;background:var(--s3);border:1px solid var(--br2);color:var(--tx);font-family:var(--fn);font-size:11px;padding:9px 12px;border-radius:10px;outline:none;">
           <button onclick="addProjectFromSettings()"
             style="background:var(--ad);border:1px solid var(--ag);color:var(--ac);font-family:var(--fn);font-size:11px;font-weight:700;padding:9px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;">+ เพิ่ม</button>
@@ -1288,7 +1288,7 @@ function doCapture(){
   const margin= Math.round(shortSide * 0.010);
   const proj  = cfg.project||'';
   const org   = 'ทต.บ้านยาง จ.ชัยภูมิ';
-  const mapSz = Math.round(shortSide * (isWide ? 0.30 : 0.27));
+  const mapSz = Math.round(shortSide * (isWide ? 0.333 : 0.30));   // ปรับให้สมส่วนกับ stamp ที่ใหญ่ขึ้น (เดิม 0.30/0.27)
 
   // ── สีข้อความ stamp: ธีมส้มทองเดียวกันทั้งหมด แยกเฉดตามความสำคัญ
   //    หัวข้อ = ทองอ่อนนวล / ค่าจริง = ทองสว่างเด่น / โครงการ = ทองเข้มเต็มสี
