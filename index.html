@@ -709,7 +709,20 @@ async function idbSavePhoto(p){
   const toStore = p.uploaded
     ? { id:p.id, dt:p.dt, project:p.project, lat:p.lat, lng:p.lng, alt:p.alt, acc:p.acc, uploaded:true, dataURL:p.dataURL }
     : { ...p };
-  try { await idbPut(IDB_STORE, toStore); } catch(e){ console.warn('idb save fail',e); }
+  try {
+    await idbPut(IDB_STORE, toStore);
+  } catch(e){
+    console.warn('idb save fail',e);
+    // เดิม fail เงียบๆ แค่ log ผู้ใช้ไม่รู้ตัวว่ารูปไม่ถูกบันทึก — นี่คือ
+    // จุดเสี่ยงที่สุด (ข้อมูลหายแบบไม่มีใครรู้) ต้องแจ้งทันทีโดยเฉพาะ
+    // กรณี storage เต็ม (QuotaExceededError) ซึ่งพบบ่อยสุดเวลาถ่ายเยอะออฟไลน์
+    const isQuota = e?.name === 'QuotaExceededError' || /quota/i.test(e?.message||'');
+    if(isQuota){
+      toast('⚠️ พื้นที่เก็บข้อมูลเต็ม! รูปอาจไม่ถูกบันทึก — กรุณาเชื่อมเน็ตเพื่อส่ง Cloud ด่วน','bad');
+    } else {
+      toast('⚠️ บันทึกรูปไม่สำเร็จในเครื่อง — กรุณาตรวจสอบพื้นที่ว่าง','bad');
+    }
+  }
 }
 async function idbRemovePhoto(id){
   if(!db) return;
@@ -1543,7 +1556,11 @@ async function _drawMiniMap(ctx, ug, fSz, mapSz, mapX, mapY){
 function _finishCapture(cv, ug, now){
   const url=cv.toDataURL('image/jpeg',0.92);
   const entry={
-    id:Date.now(), dataURL:url,
+    // เดิมใช้ Date.now() เฉยๆ ชนกันได้ถ้าถ่ายรัวภายใน millisecond เดียวกัน
+    // (กดถ่ายซ้ำเร็วมาก หรือมือถือ low-end ที่ JS loop ช้า) — เติม random
+    // suffix กันชนสนิท ยังคง sortable ตามเวลาเหมือนเดิม (prefix เป็น timestamp)
+    id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    dataURL:url,
     lat:ug?.lat??null, lng:ug?.lng??null,
     alt:ug?.alt??null, acc:ug?.acc??null,
     dt:now.toISOString(), project:cfg.project||'', uploaded:false
@@ -2023,8 +2040,35 @@ function finishInit(){
   if(!cfg.project){
     setTimeout(()=>openProjModal(true), 600);
   }
+  checkStorageQuota();   // เตือนล่วงหน้าถ้าพื้นที่เก็บข้อมูลเหลือน้อย
   if(navigator.onLine){ flushDeleteQueue(); processQueue(); }
 }
+
+/* ================================================================
+   STORAGE QUOTA CHECK — เตือนล่วงหน้าก่อนพื้นที่เก็บข้อมูลเต็ม
+   รูปที่ยังไม่ upload เก็บเป็น base64 เต็มความละเอียดใน IndexedDB
+   ถ้าถ่ายเยอะตอนออฟไลน์นาน อาจกินพื้นที่จนเต็มโดยไม่รู้ตัว — เช็คตอน
+   เปิดแอป และเช็คซ้ำทุก 5 นาทีระหว่างใช้งาน (เผื่อถ่ายต่อเนื่องนาน)
+================================================================ */
+let _storageWarned = false;
+async function checkStorageQuota(){
+  if(!navigator.storage?.estimate) return;  // browser เก่าไม่รองรับ — ข้ามเงียบๆ
+  try {
+    const est = await navigator.storage.estimate();
+    if(!est.quota) return;
+    const usedPct = (est.usage / est.quota) * 100;
+    const freeMB  = Math.round((est.quota - est.usage) / (1024*1024));
+    if(usedPct >= 90 && !_storageWarned){
+      _storageWarned = true;
+      toast(`⚠️ พื้นที่เก็บข้อมูลเหลือ ${freeMB}MB — กรุณาส่งรูปขึ้น Cloud และลบรูปเก่าด่วน`,'bad');
+    } else if(usedPct >= 75 && !_storageWarned){
+      toast(`พื้นที่เก็บข้อมูลใช้ไปแล้ว ${Math.round(usedPct)}% — แนะนำส่งรูปขึ้น Cloud`,'');
+    }
+  } catch(e){ /* บาง browser ปฏิเสธ permission — ไม่ต้องแจ้ง error รบกวน */ }
+}
+// เช็คซ้ำทุก 5 นาทีระหว่างใช้งาน เผื่อถ่ายต่อเนื่องจนพื้นที่ลดลงเรื่อยๆ
+setInterval(checkStorageQuota, 5*60*1000);
+
 </script>
 </body>
 </html>
