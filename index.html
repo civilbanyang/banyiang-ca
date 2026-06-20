@@ -1279,9 +1279,10 @@ function doCapture(){
   const now=new Date();
 
   // ── ขนาด font/map อิง short side ของ canvas จริง ──────────────
+  // ขยายใหญ่ขึ้นอีกรอบ (เดิม 0.044) ตามคำขอ — ใช้เป็นหลักฐาน ปปช. ต้องชัดสุด
   const shortSide = Math.min(W, H);
   const isWide    = W >= H;             // true = กว้าง (รวม "พอดี" ด้วย)
-  const fSz   = Math.round(shortSide * 0.044);   // ขยายใหญ่ขึ้นอีก (เดิม 0.038) — ใช้เป็นหลักฐานต้องชัดสุด
+  const fSz   = Math.round(shortSide * 0.050);
   const lh    = fSz * 1.72;
   const pad   = fSz * 1.0;
   const margin= Math.round(shortSide * 0.010);
@@ -1289,16 +1290,16 @@ function doCapture(){
   const org   = 'ทต.บ้านยาง จ.ชัยภูมิ';
   const mapSz = Math.round(shortSide * (isWide ? 0.30 : 0.27));
 
-  // ── สีข้อความ stamp: แยก "หัวข้อ" (LAT/LNG/ALT/ACC/หน่วยงาน) กับ
-  //    "ค่าจริง" (ตัวเลขพิกัด/เวลา/วันที่) ให้คนละสี เพื่อสแกนอ่านง่าย
-  //    และดูเป็นระเบียบ — ทุกแถว bold เท่ากันหมด (ไม่มีตัวบาง)
-  const CLR_LABEL    = '#7fb89e';   // หัวข้อ: LAT/LNG/ALT/ACC + ชื่อหน่วยงาน (เขียวอมฟ้า นวล รอง)
-  const CLR_VALUE    = '#ffffff';   // ค่าพิกัด/ระดับความสูง/วันที่-เวลา (ขาวสว่างที่สุด เด่นสุด)
-  const CLR_ACC_OK   = '#7ee8a8';   // ACC ดี ≤15m (เขียวสด)
+  // ── สีข้อความ stamp: ธีมส้มทองเดียวกันทั้งหมด แยกเฉดตามความสำคัญ
+  //    หัวข้อ = ทองอ่อนนวล / ค่าจริง = ทองสว่างเด่น / โครงการ = ทองเข้มเต็มสี
+  //    ให้ดูเป็นชุดสีเดียวกัน (เข้าธีมหลัก) แต่ไล่ระดับความเด่นชัดเจน
+  const CLR_LABEL    = '#92b2d2';   // หัวข้อ: LAT/LNG/ALT/ACC + ชื่อหน่วยงาน (สีธีมฟ้าเว็บ ปรับสว่างให้อ่านชัดบน stamp)
+  const CLR_VALUE    = '#ffc876';   // ค่าพิกัด/ระดับความสูง/วันที่-เวลา (ทองสว่าง เด่นสุด)
+  const CLR_ACC_OK   = '#7ee8a8';   // ACC ดี ≤15m (เขียวสด — คงไว้แยกความหมาย "ดี")
   const CLR_ACC_MID  = '#ffd966';   // ACC กลาง ≤30m (เหลือง)
-  const CLR_ACC_BAD  = '#ff9e5e';   // ACC แย่ >30m (ส้ม)
+  const CLR_ACC_BAD  = '#ff9e5e';   // ACC แย่ >30m (ส้มแดง — แยกความหมาย "แย่")
   const CLR_WARN     = '#ffc14d';   // ไม่มี GPS
-  const CLR_PROJ     = '#ffb648';   // ชื่อโครงการ (ส้มทอง เด่นแยกจาก GPS data)
+  const CLR_PROJ     = '#ffb648';   // ชื่อโครงการ (ทองเข้มเต็มสี เด่นสุดในกลุ่มทอง)
 
   // ── แถวข้อมูล ─────────────────────────────────────────────────
   const row1_parts = ug
@@ -1314,40 +1315,27 @@ function doCapture(){
     ...(org?[{t:'   ',c:CLR_LABEL},{t:org,c:CLR_LABEL}]:[])
   ];
 
-  const row3_parts = proj
-    ? [{t:'● ',c:CLR_PROJ},{t:proj,c:CLR_PROJ}]
-    : null;
-
-  const numRows = row3_parts ? 3 : 2;
-  const rr      = fSz * 0.35;
+  const rr = fSz * 0.35;
 
   // ══════════════════════════════════════════════════════════════
   //  LAYOUT — สูตรเดียว คำนวณจาก W,H ตรงๆ ไม่มีทางชนกัน
+  //  (ขั้นตอนที่ 1: หา stampW ก่อน เพื่อใช้ wrap ชื่อโครงการ)
   // ══════════════════════════════════════════════════════════════
-  let stampX, stampY, stampW, stampH, mapX, mapY;
-  const baseStampH = lh * numRows + pad * 1.1;
+  let stampX, stampY, stampW, mapX, mapY;
 
   if(isWide){
-    // กว้าง: stamp ซ้ายล่าง + map ขวาล่าง วาง "ข้างกัน" แถวเดียว
-    stampH = baseStampH;
     mapX   = W - mapSz - margin;
     mapY   = H - mapSz - margin;
     stampX = margin;
-    stampY = H - stampH - margin;
     stampW = Math.max(fSz*4, mapX - margin - stampX);   // ห้ามแตะ map
   } else {
-    // สูง: map ขวาบน + stamp ล่างเต็มความกว้าง วาง "ซ้อนกัน"
-    stampH = baseStampH;
     stampX = margin;
-    stampY = H - stampH - margin;
     stampW = W - margin*2;                               // เต็มความกว้าง
-
     mapX = W - mapSz - margin;
-    mapY = Math.max(margin, stampY - mapSz - margin);    // ห้ามแตะ stamp, ห้ามหลุดขอบบน
   }
 
-  // ── AUTO-FIT FONT: ลด fSz ถ้า row ที่ยาวสุดล้น stampW ──────────
-  // วัดความกว้างจริงด้วย font ปัจจุบัน แล้วลดขนาดจนพอดี (กัน ACC/LNG ถูกตัด)
+  // ── AUTO-FIT FONT: ลด fSz ถ้า row1/row2 (GPS+เวลา) ล้น stampW ────
+  // หมายเหตุ: row3 (ชื่อโครงการ) ไม่รวมในการ shrink — จะ wrap แทน
   ctx.font = `bold ${fSz}px "Courier New",monospace`;
   const measureRow = (parts, f) => { ctx.font = `bold ${f}px "Courier New",monospace`; return parts.reduce((s,{t})=>s+ctx.measureText(t).width,0); };
   let fitFSz = fSz;
@@ -1355,23 +1343,58 @@ function doCapture(){
   for(let tries=0; tries<12; tries++){
     const w1 = measureRow(row1_parts, fitFSz);
     const w2 = measureRow(row2_parts, fitFSz);
-    const w3 = row3_parts ? measureRow(row3_parts, fitFSz) : 0;
-    const maxW = Math.max(w1, w2, w3);
+    const maxW = Math.max(w1, w2);
     if(maxW <= availW || fitFSz <= fSz*0.55) break;
     fitFSz = Math.max(fSz*0.55, fitFSz * (availW / maxW) * 0.97);
   }
   fitFSz = Math.round(fitFSz);
 
-  // คำนวณ lh/pad/stampH ใหม่ตาม fitFSz จริง (ถ้าเล็กลง stamp ก็เตี้ยลงตาม)
   const lh2  = fitFSz * 1.72;
   const pad2 = fitFSz * 1.0;
-  stampH = lh2 * numRows + pad2 * 1.1;
+  const availW2 = stampW - pad2*2.2;
 
-  // อัปเดตตำแหน่ง Y ใหม่ตาม stampH ที่แท้จริง (กันหลุดขอบล่าง/ทับ map)
+  // ── WRAP ชื่อโครงการ: แตกเป็นหลายบรรทัดถ้ายาวเกิน stampW ─────────
+  // (ตัดคำตาม "ความกว้างจริง" ไม่ใช่จำนวนตัวอักษร เพราะภาษาไทยความกว้าง
+  //  ตัวอักษรไม่เท่ากัน — วัดทีละตัวอักษรแล้วสะสมความกว้างจนเกินค่อยขึ้นบรรทัดใหม่)
+  function wrapProjectText(text, maxWidth, fontPx){
+    ctx.font = `bold ${fontPx}px "Courier New",monospace`;
+    const prefix = '● ';
+    const prefixW = ctx.measureText(prefix).width;
+    const lines = [];
+    let current = '';
+    let currentW = prefixW;  // บรรทัดแรกมี bullet นำหน้า
+    for(const ch of text){
+      const chW = ctx.measureText(ch).width;
+      if(currentW + chW > maxWidth && current.length > 0){
+        lines.push(current);
+        current = ch;
+        currentW = chW;       // บรรทัดถัดไปไม่มี bullet นำ ไม่ต้องบวก prefixW
+      } else {
+        current += ch;
+        currentW += chW;
+      }
+    }
+    if(current) lines.push(current);
+    return lines.length ? lines : [''];
+  }
+
+  const projLines = proj ? wrapProjectText(proj, availW2, fitFSz) : [];
+  const MAX_PROJ_LINES = 3;  // กันชื่อยาวเวอร์จนกิน stamp ทั้งภาพ
+  const projLinesClamped = projLines.slice(0, MAX_PROJ_LINES);
+  if(projLines.length > MAX_PROJ_LINES){
+    // บรรทัดสุดท้ายเติม "…" บอกว่ายังมีต่อ (ชื่อยาวมากผิดปกติ)
+    const last = projLinesClamped[MAX_PROJ_LINES-1];
+    projLinesClamped[MAX_PROJ_LINES-1] = last.slice(0, Math.max(1,last.length-1)) + '…';
+  }
+
+  const numRows = 2 + projLinesClamped.length;   // GPS row + เวลา row + N บรรทัดโครงการ
+  const stampH  = lh2 * numRows + pad2 * 1.1;
+
+  // ── ตำแหน่ง Y จริง (ขึ้นกับ stampH ที่รวม wrap แล้ว) ─────────────
   stampY = H - stampH - margin;
   if(!isWide) mapY = Math.max(margin, stampY - mapSz - margin);
 
-  // ── วาด stamp backdrop (ขนาดจริงหลัง auto-fit) ──────────────
+  // ── วาด stamp backdrop ───────────────────────────────────────
   const rr2 = fitFSz * 0.35;
   ctx.fillStyle='rgba(21,25,31,0.90)';
   ctx.beginPath();
@@ -1386,7 +1409,7 @@ function doCapture(){
   ctx.fillStyle='#4a7fb5';
   ctx.fillRect(stampX, stampY+rr2, Math.max(3,fitFSz*0.10), stampH-rr2);
 
-  // ── วาดข้อความ ด้วย fitFSz (รับประกันไม่ล้น + clip กันเหนียวอีกชั้น) ──
+  // ── วาดข้อความ ──────────────────────────────────────────────
   ctx.save();
   ctx.beginPath(); ctx.rect(stampX,stampY,stampW,stampH); ctx.clip();
 
@@ -1394,15 +1417,22 @@ function doCapture(){
   let cx=stampX+pad2, y1=stampY+pad2*0.55+lh2*0.88;
   row1_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx,y1); cx+=ctx.measureText(t).width; });
 
-  ctx.font=`bold ${fitFSz}px "Courier New",monospace`;
   let cx2=stampX+pad2, y2=stampY+pad2*0.55+lh2*1.95;
   row2_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx2,y2); cx2+=ctx.measureText(t).width; });
 
-  if(row3_parts){
-    ctx.font=`bold ${fitFSz}px "Courier New",monospace`;
-    let cx3=stampX+pad2, y3=stampY+pad2*0.55+lh2*2.95;
-    row3_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx3,y3); cx3+=ctx.measureText(t).width; });
-  }
+  // วาดชื่อโครงการแบบ wrap หลายบรรทัด (bullet เฉพาะบรรทัดแรก)
+  projLinesClamped.forEach((line, i)=>{
+    const yN = stampY + pad2*0.55 + lh2*(2.95 + i);
+    let cxN = stampX + pad2;
+    if(i === 0){
+      ctx.fillStyle = CLR_PROJ;
+      ctx.fillText('● ', cxN, yN);
+      cxN += ctx.measureText('● ').width;
+    }
+    ctx.fillStyle = CLR_PROJ;
+    ctx.fillText(line, cxN, yN);
+  });
+
   ctx.restore();
 
   // ── MINI-MAP ──────────────────────────────────────────────────
@@ -1413,8 +1443,6 @@ function doCapture(){
   }
 }
 
-/* ── MINI-MAP: 3×3 tile stitch → crop กลาง → จุดอยู่กลางเสมอ ──
-   รับ mapX, mapY จาก doCapture แล้ว → layout ถูกต้องทั้ง 2 แนว */
 async function _drawMiniMap(ctx, ug, fSz, mapSz, mapX, mapY){
   const zoom  = 15;
   const TILE  = 256;
