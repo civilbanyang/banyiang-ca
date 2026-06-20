@@ -672,6 +672,26 @@ let mapFilterProject = 'all';
 let photoFilterProject = 'all';   // filter หน้า photos
 let expFilterProject = 'all';
 
+/* ================================================================
+   PER-DEVICE PROJECT SELECTION (localStorage)
+   เดิม "โครงการที่กำลังเลือกถ่ายอยู่" sync ผ่าน Google Sheet กลาง
+   ทำให้เครื่องหลายคน "แย่งกัน" ตั้งค่าเดียวกัน — เปิดแอปใหม่อาจเจอ
+   โครงการที่เคยเลือกถูกเปลี่ยนเป็นของคนอื่นโดยไม่ตั้งใจ (ใช้งานจริง
+   คือคนละคนถ่ายคนละโครงการพร้อมกัน) — ย้ายมาเก็บในเครื่องแต่ละคน
+   localStorage ไม่ sync ข้ามเครื่อง แต่ photos[]/projects[] (รายชื่อ
+   ทั้งหมด) ยังคง sync ผ่าน cloud ตามเดิม — แค่ "ตัวที่กำลังเลือกอยู่
+   ตอนนี้" เท่านั้นที่แยกเป็น per-device
+================================================================ */
+const LOCAL_PROJECT_KEY = 'surveycam_current_project';
+function loadLocalProject(){
+  try { return localStorage.getItem(LOCAL_PROJECT_KEY) || ''; }
+  catch(e){ return ''; }  // private browsing บาง browser ปิด localStorage
+}
+function saveLocalProject(name){
+  try { localStorage.setItem(LOCAL_PROJECT_KEY, name||''); }
+  catch(e){ console.warn('localStorage save fail (private browsing?)',e); }
+}
+
 const resMap = {
   '4k': {width:{ideal:4096},height:{ideal:2160}},
   'fhd':{width:{ideal:1920},height:{ideal:1080}},
@@ -907,6 +927,12 @@ function toast(msg, type=''){
    CLOUD LOAD
 ================================================================ */
 async function loadDataFromCloud(){
+  // โหลดโครงการที่เลือกไว้จากเครื่องนี้ก่อนเลย — ไม่ขึ้นกับ cloud/online
+  // เลย จึงต้องรันเสมอไม่ว่า fetch จะสำเร็จ ล้มเหลว หรือออฟไลน์ตั้งแต่ต้น
+  // (เดิมตั้งค่าไว้แค่ branch เดียวตอน fetch สำเร็จ ทำให้ลืมโครงการทุกครั้ง
+  // ที่เปิดแอปแบบออฟไลน์ หรือเน็ตหลุดกลางทาง)
+  cfg.project = loadLocalProject();
+
   if(!navigator.onLine){
     toast('ออฟไลน์ — โหลดข้อมูลจาก IndexedDB','bad');
     document.getElementById('splash').style.display='none';
@@ -924,7 +950,11 @@ async function loadDataFromCloud(){
         cfg.timer     = parseInt(data.settings.timer)||0;
         cfg.gpsThresh = parseInt(data.settings.gpsThresh)||15;
         cfg.res       = data.settings.res||'4k';
-        cfg.project   = data.settings.project||'';
+        // project (โครงการที่กำลังเลือกถ่ายอยู่) เป็น PER-DEVICE ไม่ sync
+        // จาก cloud — โหลดไว้แล้วบนสุดของฟังก์ชัน ไม่ต้องอ่านจาก
+        // data.settings.project อีก (เดิม sync ข้ามเครื่อง ทำให้เจ้าหน้าที่
+        // A เลือกโครงการนึง แล้วเครื่องของ B เปิดแอปมาเจอค่าเปลี่ยนเป็นของ B
+        // ทับ A โดยไม่ตั้งใจ — ใช้งานจริงคือคนละคนถ่ายคนละโครงการพร้อมกัน)
         try{ projects = data.settings.projects?JSON.parse(data.settings.projects):[]; }catch(e){ projects=[]; }
       }
       if(data.photos && Array.isArray(data.photos)) photos = data.photos;
@@ -1055,7 +1085,7 @@ function renderProjModalList(){
   }).join('');
 }
 function selectProject(name){
-  cfg.project=name||''; saveSetting('project',cfg.project); closeProjModal();
+  cfg.project=name||''; saveLocalProject(cfg.project); closeProjModal();
   document.getElementById('inp-project').value=cfg.project;
   const lbl=document.getElementById('inp-project-label');
   if(lbl) lbl.textContent=cfg.project||'เลือก...';
@@ -1066,13 +1096,29 @@ function addProject(){
   const name = inp.value.trim();
   if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
   if(projects.includes(name)){ toast('มีโครงการนี้แล้ว','bad'); return; }
+
+  // อัปเดต local ทันทีให้ UI ตอบสนองไว (optimistic update)
   projects.push(name);
-  saveProjectsToCloud();
   inp.value = '';
   renderProjModalList();
   renderProjSetList();
   toast('✓ เพิ่มโครงการ: '+name,'ok');
+
   if(navigator.onLine){
+    // ใช้ addProjectName (atomic merge ที่ server) แทน saveAllSettings เดิม
+    // ที่เคยส่งรายชื่อทั้งก้อนทับ — กันเครื่องอื่นที่เพิ่งเพิ่ม/ลบ
+    // โครงการพร้อมกันถูกเขียนทับหายไปเงียบๆ (race condition)
+    gasPost({ action:'addProjectName', projectName:name })
+      .then(r=>{
+        if(r.status==='success' && Array.isArray(r.projects)){
+          // sync รายชื่อจริงจาก server กลับมา เผื่อมีคนอื่นเพิ่ม/ลบ
+          // ไปพร้อมกันในช่วงเวลาเดียวกัน — ป้องกัน UI ไม่ตรงกับความจริง
+          projects = r.projects;
+          renderProjModalList();
+          renderProjSetList();
+        }
+      })
+      .catch(err=>console.warn('addProjectName error:',err));
     gasPost({ action:'ensureProjectFolder', projectName:name })
       .then(r=>{ if(r.status==='success') toast('📁 สร้างโฟลเดอร์ "'+name+'" แล้ว','ok'); })
       .catch(err=>console.warn('ensureProjectFolder error:',err));
@@ -1082,8 +1128,25 @@ function addProjectFromSettings(){
   const inp=document.getElementById('proj-set-inp'), name=inp.value.trim();
   if(!name){ toast('กรุณาระบุชื่อโครงการ','bad'); return; }
   if(projects.includes(name)){ toast('มีโครงการนี้แล้ว','bad'); return; }
-  projects.push(name); saveProjectsToCloud(); inp.value='';
+
+  projects.push(name); inp.value='';
   renderProjSetList(); toast('✓ เพิ่มโครงการ: '+name,'ok');
+
+  if(navigator.onLine){
+    // atomic merge ที่ server แทน overwrite ทั้งก้อน — เหตุผลเดียวกับ addProject()
+    gasPost({ action:'addProjectName', projectName:name })
+      .then(r=>{
+        if(r.status==='success' && Array.isArray(r.projects)){
+          projects = r.projects;
+          renderProjSetList();
+          renderProjModalList();
+        }
+      })
+      .catch(err=>console.warn('addProjectName error:',err));
+    gasPost({ action:'ensureProjectFolder', projectName:name })
+      .then(r=>{ if(r.status==='success') toast('📁 สร้างโฟลเดอร์ "'+name+'" แล้ว','ok'); })
+      .catch(err=>console.warn('ensureProjectFolder error:',err));
+  }
 }
 function deleteProject(name){
   const cnt = photos.filter(p=>p.project===name).length;
@@ -1093,7 +1156,7 @@ function deleteProject(name){
   if(!confirm(msg)) return;
   projects = projects.filter(p=>p!==name);
   photos   = photos.filter(p=>p.project!==name);
-  if(cfg.project===name){ cfg.project=''; saveSetting('project',''); renderProjBadge(); }
+  if(cfg.project===name){ cfg.project=''; saveLocalProject(''); renderProjBadge(); }
   updCnt(); renderProjModalList(); renderProjSetList();
   toast('กำลังลบโครงการ "'+name+'" ...','');
   if(navigator.onLine){
@@ -1103,6 +1166,10 @@ function deleteProject(name){
           const rows = r.rowsRemoved || 0;
           const fold = r.folderDeleted ? '📁 ลบโฟลเดอร์แล้ว' : '';
           toast(`✓ ลบ "${name}" · ${rows} รูป ${fold}`.trim(),'ok');
+          // backend ลบแบบ atomic (อ่าน list ล่าสุดก่อนแก้) อยู่แล้ว แต่ frontend
+          // ยังถือ local state เดิม — ไม่ sync กลับมาก็ไม่ตรงกับความจริงถ้ามี
+          // เครื่องอื่นเพิ่ม/ลบโครงการพร้อมกันในช่วงเดียวกัน
+          if(Array.isArray(r.projects)){ projects = r.projects; renderProjModalList(); renderProjSetList(); }
         } else { toast('❌ ลบ Cloud ล้มเหลว: '+(r.message||''),'bad'); }
       })
       .catch(err=>{ console.warn('deleteProject error:',err); idbQueueDelete({ action:'deleteProject', projectName:name }); toast('ลบจาก memory แล้ว (จะซิงค์ Cloud เมื่อออนไลน์)',''); });
@@ -1300,7 +1367,7 @@ function doCapture(){
   const pad   = fSz * 1.0;
   const margin= Math.round(shortSide * 0.010);
   const proj  = cfg.project||'';
-  const org   = 'ทต.บ้านยาง อ.เกษตรสมบูรณ์ จ.ชัยภูมิ';
+  const org   = 'ทต.บ้านยาง จ.ชัยภูมิ';
   const mapSz = Math.round(shortSide * (isWide ? 0.333 : 0.30));   // ปรับให้สมส่วนกับ stamp ที่ใหญ่ขึ้น (เดิม 0.30/0.27)
 
   // ── สีข้อความ stamp: ธีมส้มทองเดียวกันทั้งหมด แยกเฉดตามความสำคัญ
