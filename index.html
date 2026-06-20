@@ -735,6 +735,8 @@ async function updateIDBCountUI(){
    Upload Queue
 ================================================================ */
 let _uploadQueue = [], _uploading = false, _retryTimer = null;
+let _uploadFailCount = {};      // id -> จำนวนครั้งที่ fail ติดกัน
+let _uploadFailNotified = {};   // id -> เคยแจ้งเตือนแล้วหรือยัง (กัน toast ซ้ำ)
 
 async function enqueueUpload(p){
   if(!_uploadQueue.find(x=>x.id===p.id)) _uploadQueue.push(p);
@@ -749,6 +751,8 @@ async function processQueue(){
     const ok = await _doUploadOne(p);
     if(ok){
       _uploadQueue.shift();
+      delete _uploadFailCount[p.id];
+      delete _uploadFailNotified[p.id];
       const idx = photos.findIndex(x=>x.id===p.id);
       if(idx !== -1){ photos[idx].uploaded = true; photos[idx].dataURL = p._cloudUrl || photos[idx].dataURL; }
       await idbRemovePhoto(p.id);
@@ -756,19 +760,38 @@ async function processQueue(){
       updCnt();
       if(document.getElementById('pg-photos').classList.contains('active')) renderPhotos();
     } else {
+      _trackUploadFailure(p);
       scheduleRetry();
     }
   } catch(err){
     console.warn('upload err', err);
+    _trackUploadFailure(p);
     scheduleRetry();
   }
   _uploading = false;
   await updateIDBCountUI();
   if(_uploadQueue.length && navigator.onLine) setTimeout(processQueue, 1200);
 }
+
+// แจ้งเตือนผู้ใช้เมื่อ upload ล้มเหลวติดกันหลายครั้ง — กันรูปค้างเงียบๆ
+// โดยไม่มีใครรู้ตัว (เคยเป็นปัญหา: retry เงียบทุก 15 วิ ไม่บอกผู้ใช้เลย)
+function _trackUploadFailure(p){
+  _uploadFailCount[p.id] = (_uploadFailCount[p.id]||0) + 1;
+  const n = _uploadFailCount[p.id];
+  // แจ้งครั้งแรกตอน fail ครบ 3 ครั้ง (~45 วิ) แล้วไม่แจ้งซ้ำรูปเดิมอีก
+  if(n === 3 && !_uploadFailNotified[p.id]){
+    _uploadFailNotified[p.id] = true;
+    const pendingCount = _uploadQueue.length;
+    toast(`⚠️ อัปโหลดไม่สำเร็จ ${pendingCount} รูป — ระบบลองใหม่อัตโนมัติ`,'bad');
+  }
+}
 function scheduleRetry(){
   clearTimeout(_retryTimer);
-  _retryTimer = setTimeout(()=>{ if(navigator.onLine) processQueue(); }, 15000);
+  // ถ้ารูปแรกใน queue โดน rate limit ให้รอนานขึ้น (20 วิ ไม่ช่วยเพราะ limit
+  // นับเป็นนาที) — รออย่างน้อย 25 วิ ก่อนลองใหม่ ลดการยิง request ซ้ำเปล่าๆ
+  const p0 = _uploadQueue[0];
+  const delay = (p0 && p0._rateLimited) ? 25000 : 15000;
+  _retryTimer = setTimeout(()=>{ if(navigator.onLine) processQueue(); }, delay);
 }
 
 async function _doUploadOne(p){
@@ -786,6 +809,15 @@ async function _doUploadOne(p){
     p._cloudUrl = result.url;
     toast('✓ บันทึก Cloud สำเร็จ!','ok');
     return true;
+  }
+  // ถ่ายรัวเกิน 20 รูป/นาที (limit ฝั่ง server) — แจ้งเหตุผลชัดเจนครั้งเดียว
+  // แทนที่จะปล่อยให้ retry เงียบๆ จนผู้ใช้งงว่าทำไมรูปไม่ขึ้น cloud
+  if(result.code === 'RATE_LIMITED'){
+    p._rateLimited = true;
+    if(!_uploadFailNotified[p.id]){
+      _uploadFailNotified[p.id] = true;
+      toast('⏳ ถ่ายเร็วเกินไป รอสักครู่แล้วระบบจะส่งต่อให้อัตโนมัติ','bad');
+    }
   }
   return false;
 }
@@ -889,7 +921,12 @@ async function loadDataFromCloud(){
       for(const ip of idbAll){
         if(!cloudIds.has(ip.id) && ip.uploaded) await idbRemovePhoto(ip.id);
       }
-      toast('ซิงค์ข้อมูลสำเร็จ','ok');
+      // เตือนชัดเจนถ้าข้อมูลถูกตัด (เกินขีดจำกัดต่อครั้ง) — กันงงว่ารูปเก่าหายไปไหน
+      if(data.truncated){
+        toast(`⚠️ มีรูปทั้งหมด ${data.totalRows} รูป — แสดงเฉพาะ ${photos.length} รูปล่าสุด`,'bad');
+      } else {
+        toast('ซิงค์ข้อมูลสำเร็จ','ok');
+      }
     }
   } catch(err){
     console.error(err);
@@ -1953,7 +1990,11 @@ window.addEventListener('load', async ()=>{
 });
 function finishInit(){
   loadSettingsUI(); startCam('environment'); startGPS(); startClock(); updCnt();
-  setTimeout(()=>openProjModal(true), 600);
+  // ถามเลือกโครงการเฉพาะตอนยังไม่มีโครงการตั้งไว้ — ถ้าเลือกไว้แล้วจากครั้งก่อน
+  // ไม่ต้องถามซ้ำทุกครั้งที่เปิดแอป (รบกวนผู้ใช้หน้างานโดยไม่จำเป็น)
+  if(!cfg.project){
+    setTimeout(()=>openProjModal(true), 600);
+  }
   if(navigator.onLine){ flushDeleteQueue(); processQueue(); }
 }
 </script>
