@@ -1000,7 +1000,10 @@ function saveAllSettings(){
   gasPost({action:'saveAllSettings', settings:{
     grid:String(cfg.grid), timer:String(cfg.timer), res:String(cfg.res),
     gpsThresh:String(cfg.gpsThresh), qr:String(cfg.qr),
-    project:String(cfg.project||''), projects:JSON.stringify(projects)
+    projects:JSON.stringify(projects)
+    // หมายเหตุ: ตัด project ออกจาก payload นี้แล้ว — ย้ายไปเป็น
+    // per-device (localStorage) ทั้งหมด ไม่มีจุดไหนอ่าน field นี้จาก
+    // cloud อีกต่อไป การยังส่งไปเขียนทับ Sheet จะเป็น dead write เปล่าๆ
   }}).then(r=>{ if(r.status==='success') toast('✓ บันทึกตั้งค่าแล้ว','ok'); }).catch(e=>console.error(e));
 }
 function togSetting(k){
