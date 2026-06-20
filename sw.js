@@ -5,8 +5,8 @@
 //  - Background sync ready
 // ================================================================
 
-const CACHE      = 'scam5-v32';
-const TILE_CACHE = 'scam5-tiles-v32';
+const CACHE      = 'scam5-v33';
+const TILE_CACHE = 'scam5-tiles-v33';
 
 const ASSETS = [
   '/banyiang-ca/',
