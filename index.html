@@ -1244,7 +1244,7 @@ function doCapture(){
   // ── ขนาด font/map อิง short side ของ canvas จริง ──────────────
   const shortSide = Math.min(W, H);
   const isWide    = W >= H;             // true = กว้าง (รวม "พอดี" ด้วย)
-  const fSz   = Math.round(shortSide * 0.038);   // ขยายใหญ่ขึ้น (เดิม 0.030) — ใช้เป็นหลักฐานต้องชัด
+  const fSz   = Math.round(shortSide * 0.044);   // ขยายใหญ่ขึ้นอีก (เดิม 0.038) — ใช้เป็นหลักฐานต้องชัดสุด
   const lh    = fSz * 1.72;
   const pad   = fSz * 1.0;
   const margin= Math.round(shortSide * 0.010);
@@ -1252,31 +1252,33 @@ function doCapture(){
   const org   = 'ทต.บ้านยาง จ.ชัยภูมิ';
   const mapSz = Math.round(shortSide * (isWide ? 0.30 : 0.27));
 
-  // ── สีข้อความ stamp: ใช้สีเดียวกันทั้งหมดให้สว่างชัด (สีเขียวมิ้นท์อ่อน
-  //    เหมือน ACC ที่ดี) ทั้ง label, ค่า, วันที่-เวลา เพื่อให้อ่านง่ายเป็น
-  //    หลักฐานราชการ — ตัด white/gray เดิมที่จางทิ้ง
-  const CLR_MAIN = '#9be8c4';   // ข้อความหลักทั้งหมด (label+ค่า+เวลา)
-  const CLR_ACC_OK   = '#9be8c4';  // ACC ดี ≤15m (เด่นเท่าข้อความหลัก)
-  const CLR_ACC_MID  = '#f2d35a';  // ACC กลาง ≤30m
-  const CLR_ACC_BAD  = '#f2a05a';  // ACC แย่ >30m
-  const CLR_WARN     = '#f2c35a';  // ไม่มี GPS / โครงการ
+  // ── สีข้อความ stamp: แยก "หัวข้อ" (LAT/LNG/ALT/ACC/หน่วยงาน) กับ
+  //    "ค่าจริง" (ตัวเลขพิกัด/เวลา/วันที่) ให้คนละสี เพื่อสแกนอ่านง่าย
+  //    และดูเป็นระเบียบ — ทุกแถว bold เท่ากันหมด (ไม่มีตัวบาง)
+  const CLR_LABEL    = '#7fb89e';   // หัวข้อ: LAT/LNG/ALT/ACC + ชื่อหน่วยงาน (เขียวอมฟ้า นวล รอง)
+  const CLR_VALUE    = '#ffffff';   // ค่าพิกัด/ระดับความสูง/วันที่-เวลา (ขาวสว่างที่สุด เด่นสุด)
+  const CLR_ACC_OK   = '#7ee8a8';   // ACC ดี ≤15m (เขียวสด)
+  const CLR_ACC_MID  = '#ffd966';   // ACC กลาง ≤30m (เหลือง)
+  const CLR_ACC_BAD  = '#ff9e5e';   // ACC แย่ >30m (ส้ม)
+  const CLR_WARN     = '#ffc14d';   // ไม่มี GPS
+  const CLR_PROJ     = '#ffb648';   // ชื่อโครงการ (ส้มทอง เด่นแยกจาก GPS data)
 
   // ── แถวข้อมูล ─────────────────────────────────────────────────
   const row1_parts = ug
-    ? [{t:'LAT ',c:CLR_MAIN},{t:ug.lat.toFixed(6)+'°',c:CLR_MAIN},
-       {t:'   LNG ',c:CLR_MAIN},{t:ug.lng.toFixed(6)+'°',c:CLR_MAIN},
-       {t:'   ALT ',c:CLR_MAIN},{t:ug.alt?ug.alt.toFixed(1)+'m':'--',c:CLR_MAIN},
-       {t:'   ACC ±',c:CLR_MAIN},{t:Math.round(ug.acc)+'m',
+    ? [{t:'LAT ',c:CLR_LABEL},{t:ug.lat.toFixed(6)+'°',c:CLR_VALUE},
+       {t:'   LNG ',c:CLR_LABEL},{t:ug.lng.toFixed(6)+'°',c:CLR_VALUE},
+       {t:'   ALT ',c:CLR_LABEL},{t:ug.alt?ug.alt.toFixed(1)+'m':'--',c:CLR_VALUE},
+       {t:'   ACC ±',c:CLR_LABEL},{t:Math.round(ug.acc)+'m',
          c:ug.acc<=15?CLR_ACC_OK:ug.acc<=30?CLR_ACC_MID:CLR_ACC_BAD}]
     : [{t:'[ไม่มีข้อมูล GPS]',c:CLR_WARN}];
 
   const row2_parts = [
-    {t:`${fD(now)} ${fT(now)}`,c:CLR_MAIN},
-    ...(org?[{t:`   ${org}`,c:CLR_MAIN}]:[])
+    {t:`${fD(now)} ${fT(now)}`,c:CLR_VALUE},
+    ...(org?[{t:'   ',c:CLR_LABEL},{t:org,c:CLR_LABEL}]:[])
   ];
 
   const row3_parts = proj
-    ? [{t:'● ',c:CLR_WARN},{t:proj,c:CLR_WARN}]
+    ? [{t:'● ',c:CLR_PROJ},{t:proj,c:CLR_PROJ}]
     : null;
 
   const numRows = row3_parts ? 3 : 2;
@@ -1355,7 +1357,7 @@ function doCapture(){
   let cx=stampX+pad2, y1=stampY+pad2*0.55+lh2*0.88;
   row1_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx,y1); cx+=ctx.measureText(t).width; });
 
-  ctx.font=`${fitFSz}px "Courier New",monospace`;
+  ctx.font=`bold ${fitFSz}px "Courier New",monospace`;
   let cx2=stampX+pad2, y2=stampY+pad2*0.55+lh2*1.95;
   row2_parts.forEach(({t,c})=>{ ctx.fillStyle=c; ctx.fillText(t,cx2,y2); cx2+=ctx.measureText(t).width; });
 
