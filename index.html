@@ -726,9 +726,13 @@ function idbClear(storeName){ return new Promise((res,rej)=>{const tx=db.transac
 
 async function idbSavePhoto(p){
   if(!db) return;
+  // หมายเหตุ: ตัด _compressedDataURL ออกก่อนเก็บ IndexedDB เสมอ — เป็น
+  // cache ชั่วคราวสำหรับลด CPU ตอน retry upload เท่านั้น ถ้าปล่อยให้ติด
+  // ไปด้วยจะเก็บรูปซ้ำ 2 ชุด (ต้นฉบับ + บีบอัดแล้ว) เปลืองพื้นที่เก็บ
+  // ข้อมูลในเครื่องเป็นเท่าตัวโดยไม่จำเป็น
   const toStore = p.uploaded
     ? { id:p.id, dt:p.dt, project:p.project, lat:p.lat, lng:p.lng, alt:p.alt, acc:p.acc, uploaded:true, dataURL:p.dataURL }
-    : { ...p };
+    : { id:p.id, dt:p.dt, project:p.project, lat:p.lat, lng:p.lng, alt:p.alt, acc:p.acc, uploaded:p.uploaded, dataURL:p.dataURL };
   try {
     await idbPut(IDB_STORE, toStore);
   } catch(e){
@@ -830,9 +834,17 @@ function scheduleRetry(){
 async function _doUploadOne(p){
   const d = new Date(p.dt);
   const fname = `survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
-  let dataURL = p.dataURL;
-  if(dataURL?.startsWith('data:')){
-    dataURL = await compressImage(dataURL);
+  // cache ผลลัพธ์ที่บีบอัดแล้วไว้ใน p._compressedDataURL — กันประมวลผล
+  // canvas + encode JPEG ซ้ำทุกครั้งที่ retry (เช่นติด rate limit ต้องรอ
+  // 25 วิแล้วลองใหม่หลายรอบ) ซึ่งเปลืองแบต/CPU โดยไม่จำเป็น เพราะรูป
+  // ต้นฉบับไม่เปลี่ยนแปลงระหว่าง retry แต่ละครั้งอยู่แล้ว
+  let dataURL = p._compressedDataURL;
+  if(!dataURL){
+    dataURL = p.dataURL;
+    if(dataURL?.startsWith('data:')){
+      dataURL = await compressImage(dataURL);
+    }
+    p._compressedDataURL = dataURL;   // เก็บไว้ใช้ retry รอบถัดไป
   }
   const payload = { token:APP_TOKEN, action:'uploadPhoto', id:p.id, dataURL, filename:fname,
     lat:p.lat||'', lng:p.lng||'', alt:p.alt||'', acc:p.acc||'', dt:p.dt, project:p.project||'' };
@@ -1158,6 +1170,10 @@ function deleteProject(name){
     : `ลบโครงการ "${name}" ?\n\nจะลบโฟลเดอร์ใน Drive ด้วย`;
   if(!confirm(msg)) return;
   projects = projects.filter(p=>p!==name);
+  // ถอดรูปของโครงการนี้ที่ยังค้างใน upload queue ออกด้วย — เหตุผลเดียว
+  // กับ delP()/clearAll(): กันรูปที่ถูกลบไปพร้อมโครงการ แต่ยังค้างรอ
+  // อัปโหลดอยู่ ถูกส่งขึ้น Cloud ใหม่ทีหลังหลังจากที่โครงการถูกลบไปแล้ว
+  photos.filter(p=>p.project===name).forEach(p=>removeFromUploadQueue(p.id));
   photos   = photos.filter(p=>p.project!==name);
   if(cfg.project===name){ cfg.project=''; saveLocalProject(''); renderProjBadge(); }
   updCnt(); renderProjModalList(); renderProjSetList();
@@ -1846,12 +1862,26 @@ function extractDriveFileId(url){
   const m=url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/)||url.match(/\/d\/([a-zA-Z0-9_-]{10,})\//);
   return m?m[1]:null;
 }
+/* ถอดรูปออกจาก upload queue + ล้าง fail-tracking state ที่ค้างไว้
+   เรียกตอนลบรูป กันไม่ให้รูปที่เพิ่งลบไปถูกอัปโหลดขึ้น Cloud ใหม่
+   ทีหลังโดยที่ผู้ใช้ไม่รู้ตัว (เคยเป็นบั๊ก: ลบรูปที่ยังค้างใน queue
+   รออัปโหลดอยู่ จะไม่ถูกถอดออก แล้วระบบ retry จนสำเร็จ สร้างรูปที่
+   "ลบไปแล้ว" กลับขึ้นมาใหม่ใน Sheet/Drive) */
+function removeFromUploadQueue(id){
+  const qIdx = _uploadQueue.findIndex(x=>x.id===id);
+  if(qIdx !== -1) _uploadQueue.splice(qIdx,1);
+  delete _uploadFailCount[id];
+  delete _uploadFailNotified[id];
+}
+
 function delP(){
   if(vIdx<0) return;
   if(!confirm('ลบรูปนี้? จะลบทั้ง Sheet และไฟล์ใน Drive')) return;
   const photo=photos[vIdx], pId=photo.id, driveFileId=extractDriveFileId(photo.dataURL);
   const delPayload={action:'deletePhoto', id:pId, driveFileId};
-  photos.splice(vIdx,1); idbRemovePhoto(pId); updCnt(); goBack();
+  photos.splice(vIdx,1);
+  removeFromUploadQueue(pId);   // กันรูปที่ลบแล้วถูกอัปโหลดซ้ำทีหลัง
+  idbRemovePhoto(pId); updCnt(); goBack();
   if(navigator.onLine){
     gasPost(delPayload)
       .then(res=>{ toast(res.status==='success'?'✓ ลบสำเร็จ':'ลบล้มเหลว',res.status==='success'?'ok':'bad'); })
@@ -1864,6 +1894,11 @@ function delP(){
 function clearAll(){
   if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป?`)) return;
   const driveFileIds=photos.map(p=>extractDriveFileId(p.dataURL)).filter(Boolean);
+  // ล้าง upload queue ทั้งหมดด้วย — เหตุผลเดียวกับ delP(): รูปที่ยังค้าง
+  // รออัปโหลดอยู่ตอนกด "ลบทั้งหมด" ต้องไม่ถูกส่งขึ้น Cloud อีกทีหลัง
+  _uploadQueue = [];
+  _uploadFailCount = {};
+  _uploadFailNotified = {};
   photos=[]; idbClear(IDB_STORE); updCnt(); toast('กำลังลบจาก Cloud...');
   if(navigator.onLine){
     gasPost({action:'deleteAllPhotos', driveFileIds})
