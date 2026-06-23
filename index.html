@@ -898,15 +898,30 @@ async function compressImage(dataURL){
 ================================================================ */
 async function idbQueueDelete(action_payload){
   if(!db) return;
-  try { await idbPut(IDB_DEL_STORE, {ts:Date.now(), ...action_payload}); } catch(e){ console.warn('idb del queue fail',e); }
+  // BUG FIX: เดิม spread action_payload เข้าไปตรงๆ ทำให้ field 'id' (photo id) ถูก
+  // IDB autoIncrement key ทับ หรือถูก destructure หายใน flushDeleteQueue
+  // ทำให้ GAS deletePhoto ไม่ได้รับ data.id → หาแถวใน Sheet ไม่เจอ → ลบไม่ออก
+  // แก้: เก็บ photo id ไว้ใน field 'photoId' แยกต่างหาก ไม่ชนกับ IDB key 'id'
+  try {
+    await idbPut(IDB_DEL_STORE, {
+      ts: Date.now(),
+      photoId: action_payload.id,   // เก็บ photo id ไว้แยก
+      ...action_payload              // spread ที่เหลือ (action, driveFileId, projectName ฯลฯ)
+    });
+  } catch(e){ console.warn('idb del queue fail',e); }
 }
 async function flushDeleteQueue(){
   if(!db || !navigator.onLine) return;
   const items = await idbGetAll(IDB_DEL_STORE);
   for(const item of items){
     try {
-      const {id: rowId, ...payload} = item;
-      const r = await fetch(GAS_URL, {method:'POST', body:JSON.stringify({token:APP_TOKEN,...payload}), headers:{'Content-Type':'text/plain;charset=utf-8'}});
+      // BUG FIX: แยก rowId (IDB key) และ photoId (photo id จริง) ออกจาก payload
+      // แล้วส่ง id: photoId ไปให้ GAS เพื่อให้ deletePhoto ค้นหาแถวใน Sheet เจอ
+      const {id: rowId, photoId, ts, ...rest} = item;
+      const gasPayload = {token:APP_TOKEN, ...rest};
+      // ถ้า action นี้ต้องการ photo id (deletePhoto) ให้ใส่ id กลับเข้าไป
+      if(photoId !== undefined) gasPayload.id = photoId;
+      const r = await fetch(GAS_URL, {method:'POST', body:JSON.stringify(gasPayload), headers:{'Content-Type':'text/plain;charset=utf-8'}});
       const res = await r.json();
       if(res.status==='success') await idbDelete(IDB_DEL_STORE, rowId);
     } catch(e){ break; }
@@ -1265,7 +1280,11 @@ function onGPS(pos){
   gps=c; gpsHist.push(c);
   if(gpsHist.length>20) gpsHist.shift();
   bestGps=gpsHist.reduce((a,b)=>b.acc<a.acc?b:a, gpsHist[0]);
-  const good=gpsHist.filter(g=>g.acc<30);
+  // BUG FIX (acc=0): เดิม filter แค่ g.acc<30 — บาง device (Android emulator) report
+  // accuracy=0 ได้ ทำให้ 1/g.acc = Infinity → sumW = Infinity → wLat/wLng = NaN
+  // → bestGps.lat = NaN → stamp แสดง "NaN°" บนรูป
+  // แก้: เพิ่ม g.acc > 0 ใน filter ก่อน เพื่อกัน division-by-zero
+  const good=gpsHist.filter(g=>g.acc>0&&g.acc<30);
   if(good.length>=3){
     const sumW=good.reduce((s,g)=>s+(1/g.acc),0);
     const wLat=good.reduce((s,g)=>s+(g.lat/g.acc),0)/sumW;
