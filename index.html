@@ -1405,7 +1405,7 @@ function doCapture(){
   const pad   = fSz * 1.0;
   const margin= Math.round(shortSide * 0.010);
   const proj  = cfg.project||'';
-  const org   = 'ทต.บ้านยาง จ.ชัยภูมิ';
+  const org   = 'ทต.บ้านยาง อ.เกษตรสมบูรณ์ จ.ชัยภูมิ';
   const mapSz = Math.round(shortSide * (isWide ? 0.333 : 0.30));   // ปรับให้สมส่วนกับ stamp ที่ใหญ่ขึ้น (เดิม 0.30/0.27)
 
   // ── สีข้อความ stamp: ธีมส้มทองเดียวกันทั้งหมด แยกเฉดตามความสำคัญ
@@ -2160,12 +2160,24 @@ window.addEventListener('offline', ()=>{
 ================================================================ */
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){
+    // ── ซ่อน tab / เปลี่ยน tab ──────────────────────────────
     stopGPS();
-  } else {
-    // กลับมาเปิดแอป — เริ่ม GPS ใหม่ทันที (ถ้าเคย start ไปแล้วครั้งแรก)
-    if(_gpsWatchId === null && stream){   // stream != null แปลว่าแอป init เสร็จแล้ว ไม่ใช่ครั้งแรกที่ยังโหลดไม่เสร็จ
-      startGPS();
+    // หยุดกล้องด้วย — เดิมไม่ได้หยุด ทำให้กล้องค้างอยู่ใน background
+    // browser บางตัว (iOS Safari, Android Chrome) lock stream ไว้
+    // ทำให้กลับมาแล้วกล้องค้าง/ดำ ต้องปิดแอปแล้วเปิดใหม่
+    if(stream){
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+      const v = document.getElementById('video');
+      if(v) v.srcObject = null;
     }
+  } else {
+    // ── กลับมา tab นี้ ────────────────────────────────────────
+    // เริ่ม GPS ใหม่ (stream==null แล้วก็ยังเช็ค _gpsWatchId แทน)
+    if(_gpsWatchId === null) startGPS();
+    // เริ่มกล้องใหม่ — เดิมไม่ได้ restart กล้อง
+    // ทำให้กลับมาแล้วเห็นแค่หน้าจอดำ จนกว่าจะ reload
+    startCam(facing);
   }
 });
 
