@@ -5,8 +5,8 @@
 //  - Background sync ready
 // ================================================================
 
-const CACHE      = 'scam5-v41';
-const TILE_CACHE = 'scam5-tiles-v41';
+const CACHE      = 'scam5-v42';
+const TILE_CACHE = 'scam5-tiles-v42';
 
 const ASSETS = [
   '/banyiang-ca/',
@@ -38,26 +38,64 @@ self.addEventListener('activate', e => {
   );
 });
 
+// FIX 5: tile cache — จำกัด size (500 tiles) + expiry (7 วัน)
+// เดิมไม่มี limit เลย ใช้งานนานๆ storage เต็มโดยไม่รู้ตัว
+const TILE_MAX   = 500;       // จำนวน tile สูงสุดที่เก็บ
+const TILE_TTL   = 7*24*3600*1000;  // อายุ tile = 7 วัน (ms)
+
+async function cacheTileWithLimit(cache, request, response) {
+  // เพิ่ม timestamp header เพื่อตรวจ expiry ทีหลัง
+  const headers = new Headers(response.headers);
+  headers.set('x-tile-cached-at', Date.now().toString());
+  const toStore = new Response(await response.clone().arrayBuffer(), {
+    status: response.status, statusText: response.statusText, headers
+  });
+  await cache.put(request, toStore);
+  // ตรวจ size — ถ้าเกิน TILE_MAX ลบเก่าสุดออก
+  const keys = await cache.keys();
+  if (keys.length > TILE_MAX) {
+    // เรียงตาม cached-at แล้วลบที่เก่าที่สุด
+    const withTs = await Promise.all(keys.map(async k => {
+      const r = await cache.match(k);
+      const ts = parseInt(r?.headers.get('x-tile-cached-at') || '0');
+      return { k, ts };
+    }));
+    withTs.sort((a,b) => a.ts - b.ts);
+    const toDelete = withTs.slice(0, keys.length - TILE_MAX);
+    await Promise.all(toDelete.map(x => cache.delete(x.k)));
+  }
+}
+
+async function matchTileWithExpiry(cache, request) {
+  const cached = await cache.match(request);
+  if (!cached) return null;
+  const ts = parseInt(cached.headers.get('x-tile-cached-at') || '0');
+  if (Date.now() - ts > TILE_TTL) {
+    await cache.delete(request);  // หมดอายุ — ลบออก
+    return null;
+  }
+  return cached;
+}
+
 // ── FETCH ─────────────────────────────────────────────────────────
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
-  // OSM / CartoDB map tiles — cache aggressively for offline use
+  // OSM / CartoDB map tiles — cache with size limit + TTL (FIX 5)
   if (
     url.includes('tile.openstreetmap.org') ||
     url.includes('tile.opentopomap.org')   ||
     url.includes('basemaps.cartocdn.com')
   ) {
     e.respondWith(
-      caches.open(TILE_CACHE).then(cache =>
-        cache.match(e.request).then(cached => {
-          if (cached) return cached;
-          return fetch(e.request).then(res => {
-            if (res.ok) cache.put(e.request, res.clone());
-            return res;
-          }).catch(() => new Response('', { status: 408 }));
-        })
-      )
+      caches.open(TILE_CACHE).then(async cache => {
+        const cached = await matchTileWithExpiry(cache, e.request);
+        if (cached) return cached;
+        return fetch(e.request).then(res => {
+          if (res.ok) cacheTileWithLimit(cache, e.request, res.clone());
+          return res;
+        }).catch(() => new Response('', { status: 408 }));
+      })
     );
     return;
   }
