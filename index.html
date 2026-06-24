@@ -810,16 +810,26 @@ async function processQueue(){
   if(_uploadQueue.length && navigator.onLine) setTimeout(processQueue, 1200);
 }
 
-// แจ้งเตือนผู้ใช้เมื่อ upload ล้มเหลวติดกันหลายครั้ง — กันรูปค้างเงียบๆ
-// โดยไม่มีใครรู้ตัว (เคยเป็นปัญหา: retry เงียบทุก 15 วิ ไม่บอกผู้ใช้เลย)
+// FIX 4: เพิ่ม retry limit — เดิม retry ไปเรื่อยๆ ไม่มีหยุด
+// ถ้ารูปเสียหายหรือ GAS reject ถาวร จะกิน quota และ block รูปอื่นในคิวตลอด
+// แก้: ถ้า fail เกิน MAX_UPLOAD_RETRIES ครั้ง → เอาออกจาก queue + แจ้งผู้ใช้
+const MAX_UPLOAD_RETRIES = 10;
 function _trackUploadFailure(p){
   _uploadFailCount[p.id] = (_uploadFailCount[p.id]||0) + 1;
   const n = _uploadFailCount[p.id];
-  // แจ้งครั้งแรกตอน fail ครบ 3 ครั้ง (~45 วิ) แล้วไม่แจ้งซ้ำรูปเดิมอีก
+  // แจ้งครั้งแรกตอน fail ครบ 3 ครั้ง (~45 วิ)
   if(n === 3 && !_uploadFailNotified[p.id]){
     _uploadFailNotified[p.id] = true;
     const pendingCount = _uploadQueue.length;
     toast(`⚠️ อัปโหลดไม่สำเร็จ ${pendingCount} รูป — ระบบลองใหม่อัตโนมัติ`,'bad');
+  }
+  // FIX 4: เกิน retry limit → เอาออกจาก queue ไม่ให้ block รูปอื่น
+  if(n >= MAX_UPLOAD_RETRIES){
+    console.warn(`[SurveyCAM] upload ล้มเหลว ${n} ครั้ง → หยุด retry รูป ${p.id}`);
+    _uploadQueue.shift();
+    delete _uploadFailCount[p.id];
+    delete _uploadFailNotified[p.id];
+    toast(`❌ อัปโหลดรูปไม่สำเร็จหลังลอง ${MAX_UPLOAD_RETRIES} ครั้ง — รูปถูกเก็บในเครื่องแล้ว`,'bad');
   }
 }
 function scheduleRetry(){
@@ -848,8 +858,17 @@ async function _doUploadOne(p){
   }
   const payload = { token:APP_TOKEN, action:'uploadPhoto', id:p.id, dataURL, filename:fname,
     lat:p.lat||'', lng:p.lng||'', alt:p.alt||'', acc:p.acc||'', dt:p.dt, project:p.project||'' };
-  const res = await fetch(GAS_URL, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}});
-  const result = await res.json();
+  // FIX 2: เพิ่ม timeout 30 วิ — เดิมไม่มี timeout เลย
+  // ถ้าเน็ตช้ามากหรือ GAS ไม่ตอบ fetch จะค้างอยู่ตลอด ทำให้ queue ติด
+  const controller = new AbortController();
+  const _fetchTimeout = setTimeout(()=>controller.abort(), 30000);
+  let res, result;
+  try {
+    res = await fetch(GAS_URL, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}, signal:controller.signal});
+    result = await res.json();
+  } finally {
+    clearTimeout(_fetchTimeout);
+  }
   if(result.status === 'success'){
     p._cloudUrl = result.url;
     toast('✓ บันทึก Cloud สำเร็จ!','ok');
@@ -921,9 +940,19 @@ async function flushDeleteQueue(){
       const gasPayload = {token:APP_TOKEN, ...rest};
       // ถ้า action นี้ต้องการ photo id (deletePhoto) ให้ใส่ id กลับเข้าไป
       if(photoId !== undefined) gasPayload.id = photoId;
-      const r = await fetch(GAS_URL, {method:'POST', body:JSON.stringify(gasPayload), headers:{'Content-Type':'text/plain;charset=utf-8'}});
-      const res = await r.json();
-      if(res.status==='success') await idbDelete(IDB_DEL_STORE, rowId);
+      // FIX 2: timeout 30 วิ สำหรับ offline delete flush เช่นกัน
+      const _dc = new AbortController();
+      const _dt = setTimeout(()=>_dc.abort(), 30000);
+      let r, res;
+      try {
+        r = await fetch(GAS_URL, {method:'POST', body:JSON.stringify(gasPayload), headers:{'Content-Type':'text/plain;charset=utf-8'}, signal:_dc.signal});
+        res = await r.json();
+      } finally { clearTimeout(_dt); }
+      if(res.status==='success'){
+        await idbDelete(IDB_DEL_STORE, rowId);
+        // FIX 7: แจ้งผู้ใช้ว่าลบสำเร็จหลังกลับมา online
+        toast('🗑 ลบรูปที่ค้างไว้สำเร็จแล้ว','ok');
+      }
     } catch(e){ break; }
   }
 }
@@ -1232,12 +1261,24 @@ function goPg(name){
   if(name==='photos') renderPhotos();
   if(name==='map') initMap();
   if(name==='export'){ updCnt(); updateExpFilterChips(); updateExpCountLabel(); }
+  // FIX 3: หยุดกล้องเมื่อออกจากหน้า cam — เดิมกล้องเปิดค้างทุกหน้า
+  // กิน battery + ไฟกล้องติดตลอดแม้ไม่ได้ใช้
+  if(name!=='cam' && stream){
+    stream.getTracks().forEach(t=>t.stop());
+    stream=null;
+    const v=document.getElementById('video');
+    if(v) v.srcObject=null;
+  }
 }
 function goBack(){
   if(!stack.length) return;
   const name=stack.pop();
   document.getElementById('pg-'+name)?.classList.remove('active');
-  if(!stack.length) switchTab(document.querySelector('.ntab'),'cam');
+  // FIX 3: กลับมาหน้า cam → restart กล้อง
+  if(!stack.length){
+    switchTab(document.querySelector('.ntab'),'cam');
+    if(!stream) startCam(facing);
+  }
 }
 function switchTab(el,name){
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
@@ -1352,9 +1393,24 @@ function pressShutter(){
   if(timerRunning) return;
   if(!gps){ lockPending=true; document.getElementById('glock').classList.add('show'); return; }
   if(gps.acc>cfg.gpsThresh){ lockPending=true; document.getElementById('glock').classList.add('show'); return; }
+  // FIX 6: แจ้งเตือนถ้า GPS ยังไม่นิ่งพอ (acc แย่กว่า 2x threshold)
+  // เดิมไม่มีการเตือน — ผู้ใช้ไม่รู้ว่าพิกัดที่ stamp บนรูปอาจคลาดเคลื่อน
+  // threshold เดิม (gpsThresh) ใช้ block การถ่าย — ตรงนี้ใช้ warn เท่านั้น
+  // ยังถ่ายได้ แต่แจ้งให้รู้ตัว
+  const warnThresh = cfg.gpsThresh * 2;
+  if(bestGps && bestGps.acc > cfg.gpsThresh && bestGps.acc <= warnThresh){
+    toast(`⚠️ GPS ยังไม่นิ่ง (±${Math.round(bestGps.acc)}m) — ถ่ายแล้วพิกัดอาจคลาดเคลื่อน`,'bad');
+  }
   startTimerOrCapture();
 }
 function skipLock(){ lockPending=false; document.getElementById('glock').classList.remove('show'); startTimerOrCapture(); }
+let _timerInterval = null;
+function cancelTimer(){
+  if(_timerInterval){ clearInterval(_timerInterval); _timerInterval=null; }
+  timerRunning=false;
+  const td=document.getElementById('timer-display');
+  if(td) td.style.display='none';
+}
 function startTimerOrCapture(){
   const sec=parseInt(cfg.timer)||0;
   if(!sec){ doCapture(); return; }
@@ -1362,7 +1418,20 @@ function startTimerOrCapture(){
   const td=document.getElementById('timer-display');
   td.style.display='block'; td.textContent=sec;
   let remaining=sec;
-  const iv=setInterval(()=>{ remaining--; if(remaining<=0){ clearInterval(iv); td.style.display='none'; timerRunning=false; doCapture(); } else td.textContent=remaining; },1000);
+  // FIX 1: เก็บ interval id ใน _timerInterval เพื่อให้ cancelTimer() หยุดได้
+  // เดิม iv เป็น local var — เปลี่ยน tab กลางนับถอยหลัง timer ยังเดินต่อ
+  // พอครบเวลาถ่ายรูปทั้งที่กล้อง stop แล้ว → ได้รูปดำหรือ error
+  _timerInterval=setInterval(()=>{
+    remaining--;
+    if(remaining<=0){
+      clearInterval(_timerInterval); _timerInterval=null;
+      td.style.display='none'; timerRunning=false;
+      // ตรวจว่ากล้องยังพร้อมก่อน capture
+      const v=document.getElementById('video');
+      if(!stream||!v?.videoWidth){ toast('กล้องไม่พร้อม — ยกเลิกถ่าย','bad'); return; }
+      doCapture();
+    } else td.textContent=remaining;
+  },1000);
 }
 
 /* ================================================================
@@ -1405,7 +1474,7 @@ function doCapture(){
   const pad   = fSz * 1.0;
   const margin= Math.round(shortSide * 0.010);
   const proj  = cfg.project||'';
-  const org   = 'ทต.บ้านยาง อ.เกษตรสมบูรณ์ จ.ชัยภูมิ';
+  const org   = 'ทต.บ้านยาง จ.ชัยภูมิ';
   const mapSz = Math.round(shortSide * (isWide ? 0.333 : 0.30));   // ปรับให้สมส่วนกับ stamp ที่ใหญ่ขึ้น (เดิม 0.30/0.27)
 
   // ── สีข้อความ stamp: ธีมส้มทองเดียวกันทั้งหมด แยกเฉดตามความสำคัญ
@@ -2162,6 +2231,9 @@ document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){
     // ── ซ่อน tab / เปลี่ยน tab ──────────────────────────────
     stopGPS();
+    // FIX 1: ยกเลิก self-timer ถ้ากำลังนับถอยหลังอยู่
+    // เดิม timer ยังเดินใน background พอครบเวลาถ่ายรูปตอนกล้อง stop แล้ว
+    cancelTimer();
     // หยุดกล้องด้วย — เดิมไม่ได้หยุด ทำให้กล้องค้างอยู่ใน background
     // browser บางตัว (iOS Safari, Android Chrome) lock stream ไว้
     // ทำให้กลับมาแล้วกล้องค้าง/ดำ ต้องปิดแอปแล้วเปิดใหม่
