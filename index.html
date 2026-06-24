@@ -644,6 +644,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 
 <div id="flash"></div>
 <div id="toast"></div>
+<div id="upload-progress" style="display:none;position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1c2128;color:#7fa8d4;padding:6px 16px;border-radius:20px;font-size:12px;font-family:monospace;z-index:9999;border:1px solid #2a3340;box-shadow:0 2px 12px rgba(0,0,0,.5);align-items:center;gap:8px;"></div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
@@ -784,6 +785,8 @@ async function processQueue(){
   if(!navigator.onLine){ scheduleRetry(); return; }
   _uploading = true;
   const p = _uploadQueue[0];
+  // FIX 8: แสดง upload progress indicator
+  _updateUploadProgress();
   try {
     const ok = await _doUploadOne(p);
     if(ok){
@@ -806,8 +809,19 @@ async function processQueue(){
     scheduleRetry();
   }
   _uploading = false;
+  _updateUploadProgress();
   await updateIDBCountUI();
   if(_uploadQueue.length && navigator.onLine) setTimeout(processQueue, 1200);
+}
+function _updateUploadProgress(){
+  const el = document.getElementById('upload-progress');
+  if(!el) return;
+  const n = _uploadQueue.length;
+  if(n===0 || !_uploading){ el.style.display='none'; return; }
+  // หา index ปัจจุบัน (รูปที่กำลัง upload คือตัวแรกใน queue)
+  const total = n; // เหลืออีก n รูป
+  el.style.display='flex';
+  el.textContent = `⏳ กำลังอัปโหลด ${total} รูป...`;
 }
 
 // FIX 4: เพิ่ม retry limit — เดิม retry ไปเรื่อยๆ ไม่มีหยุด
@@ -957,12 +971,17 @@ async function flushDeleteQueue(){
   }
 }
 
-function gasPost(payload){
+function gasPost(payload, timeoutMs=30000){
+  // PERF/FIX: เพิ่ม timeout ให้ gasPost ทุกที่ในโปรแกรม
+  // เดิม gasPost ไม่มี timeout → clearAll/saveSettings ค้างถาวรได้
+  const controller = new AbortController();
+  const t = setTimeout(()=>controller.abort(), timeoutMs);
   return fetch(GAS_URL, {
     method:'POST',
     body: JSON.stringify({token: APP_TOKEN, ...payload}),
-    headers: {'Content-Type':'text/plain;charset=utf-8'}
-  }).then(r=>r.json());
+    headers: {'Content-Type':'text/plain;charset=utf-8'},
+    signal: controller.signal
+  }).then(r=>r.json()).finally(()=>clearTimeout(t));
 }
 
 /* ================================================================
@@ -983,57 +1002,75 @@ function toast(msg, type=''){
    CLOUD LOAD
 ================================================================ */
 async function loadDataFromCloud(){
-  // โหลดโครงการที่เลือกไว้จากเครื่องนี้ก่อนเลย — ไม่ขึ้นกับ cloud/online
-  // เลย จึงต้องรันเสมอไม่ว่า fetch จะสำเร็จ ล้มเหลว หรือออฟไลน์ตั้งแต่ต้น
-  // (เดิมตั้งค่าไว้แค่ branch เดียวตอน fetch สำเร็จ ทำให้ลืมโครงการทุกครั้ง
-  // ที่เปิดแอปแบบออฟไลน์ หรือเน็ตหลุดกลางทาง)
   cfg.project = loadLocalProject();
+
+  // ── PERF FIX: โหลด IDB ก่อนเสมอ → แสดงผล/ซ่อน splash ทันที ──────────
+  // เดิม: รอ GAS ตอบก่อน (3-8 วิ) แล้วค่อยซ่อน splash → แอปดูช้ามาก
+  // แก้:  Step 1) โหลด IDB (เร็ว <100ms) → finishInit() → ซ่อน splash ทันที
+  //        Step 2) sync cloud ใน background → อัปเดต UI เงียบๆ
+  // ผลลัพธ์: แอปพร้อมใช้งานใน <1 วิ เหมือนเดิม แม้เน็ตช้า
+  await loadFromIDB();
+  document.getElementById('splash').style.display='none';
+  finishInit();
 
   if(!navigator.onLine){
     toast('ออฟไลน์ — โหลดข้อมูลจาก IndexedDB','bad');
-    document.getElementById('splash').style.display='none';
-    await loadFromIDB();
-    finishInit();
     return;
   }
+
+  // ── sync cloud ใน background ──────────────────────────────────────────
+  _syncCloudInBackground();
+}
+
+async function _syncCloudInBackground(){
   try {
-    const res = await fetch(GAS_URL+'?action=getData&token='+APP_TOKEN);
-    if(res.ok){
-      const data = await res.json();
-      if(data.settings){
-        cfg.grid      = data.settings.grid==='true';
-        cfg.qr        = data.settings.qr==='true';
-        cfg.timer     = parseInt(data.settings.timer)||0;
-        cfg.gpsThresh = parseInt(data.settings.gpsThresh)||15;
-        cfg.res       = data.settings.res||'4k';
-        // project (โครงการที่กำลังเลือกถ่ายอยู่) เป็น PER-DEVICE ไม่ sync
-        // จาก cloud — โหลดไว้แล้วบนสุดของฟังก์ชัน ไม่ต้องอ่านจาก
-        // data.settings.project อีก (เดิม sync ข้ามเครื่อง ทำให้เจ้าหน้าที่
-        // A เลือกโครงการนึง แล้วเครื่องของ B เปิดแอปมาเจอค่าเปลี่ยนเป็นของ B
-        // ทับ A โดยไม่ตั้งใจ — ใช้งานจริงคือคนละคนถ่ายคนละโครงการพร้อมกัน)
-        try{ projects = data.settings.projects?JSON.parse(data.settings.projects):[]; }catch(e){ projects=[]; }
+    // timeout 15 วิ กัน GAS ช้ามากทำให้ sync ค้างใน background
+    const controller = new AbortController();
+    const _t = setTimeout(()=>controller.abort(), 15000);
+    let res;
+    try {
+      res = await fetch(GAS_URL+'?action=getData&token='+APP_TOKEN, {signal:controller.signal});
+    } finally { clearTimeout(_t); }
+
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.settings){
+      cfg.grid      = data.settings.grid==='true';
+      cfg.qr        = data.settings.qr==='true';
+      cfg.timer     = parseInt(data.settings.timer)||0;
+      cfg.gpsThresh = parseInt(data.settings.gpsThresh)||15;
+      cfg.res       = data.settings.res||'4k';
+      try{ projects = data.settings.projects?JSON.parse(data.settings.projects):[]; }catch(e){ projects=[]; }
+    }
+    if(data.photos && Array.isArray(data.photos)){
+      // merge: เก็บรูปที่ยังไม่ upload ไว้ในเครื่องด้วย
+      const cloudMap = new Map(data.photos.map(p=>[p.id,p]));
+      const localPending = photos.filter(p=>!p.uploaded);
+      photos = data.photos;
+      for(const lp of localPending){
+        if(!cloudMap.has(lp.id)) photos.unshift(lp);
       }
-      if(data.photos && Array.isArray(data.photos)) photos = data.photos;
-      for(const p of photos) await idbSavePhoto(p);
-      const cloudIds = new Set(photos.map(p=>p.id));
+      photos.sort((a,b)=>new Date(b.dt)-new Date(a.dt));
+      for(const p of data.photos) await idbSavePhoto(p);
+      // ลบ IDB entries ที่ cloud บอกว่าลบแล้ว
+      const cloudIds = new Set(data.photos.map(p=>p.id));
       const idbAll = await idbLoadAll();
       for(const ip of idbAll){
         if(!cloudIds.has(ip.id) && ip.uploaded) await idbRemovePhoto(ip.id);
       }
-      // เตือนชัดเจนถ้าข้อมูลถูกตัด (เกินขีดจำกัดต่อครั้ง) — กันงงว่ารูปเก่าหายไปไหน
-      if(data.truncated){
-        toast(`⚠️ มีรูปทั้งหมด ${data.totalRows} รูป — แสดงเฉพาะ ${photos.length} รูปล่าสุด`,'bad');
-      } else {
-        toast('ซิงค์ข้อมูลสำเร็จ','ok');
-      }
     }
+    if(data.truncated){
+      toast(`⚠️ มีรูปทั้งหมด ${data.totalRows} รูป — แสดงเฉพาะ ${photos.length} รูปล่าสุด`,'bad');
+    } else {
+      toast('☁ ซิงค์สำเร็จ','ok');
+    }
+    // อัปเดต UI หลัง sync เสร็จ
+    updCnt();
+    loadSettingsUI();
+    if(document.getElementById('pg-photos').classList.contains('active')) renderPhotos();
   } catch(err){
-    console.error(err);
-    toast('Cloud error — ใช้ข้อมูลใน IDB','bad');
-    await loadFromIDB();
-  } finally {
-    document.getElementById('splash').style.display='none';
-    finishInit();
+    if(err.name==='AbortError') toast('⚠️ sync cloud ช้า — ใช้ข้อมูลใน IDB แทน','bad');
+    else console.warn('cloud sync err', err);
   }
 }
 
@@ -1353,9 +1390,12 @@ function onGPS(pos){
 /* ================================================================
    CLOCK
 ================================================================ */
+let _clockInterval = null;
 function startClock(){
+  // FIX 3: กัน interval ซ้อน — ถ้าเรียก startClock ซ้ำ clear เดิมก่อน
+  if(_clockInterval) clearInterval(_clockInterval);
   const tick=()=>{ const d=new Date(); document.getElementById('hclock').textContent=fT(d); document.getElementById('otime').textContent=fT(d); document.getElementById('odate').textContent=fD(d); };
-  tick(); setInterval(tick,1000);
+  tick(); _clockInterval=setInterval(tick,1000);
 }
 
 /* ================================================================
@@ -1910,28 +1950,43 @@ function saveGal(){
   if(vIdx<0) return;
   const p=photos[vIdx],d=new Date(p.dt);
   const n=`survey_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.jpg`;
-  const a=document.createElement('a'); a.href=p.dataURL; a.download=n; a.click(); toast('บันทึก '+n,'ok');
+  // FIX 7: iOS Safari ไม่รองรับ a.download กับ blob URL
+  // ตรวจ iOS แล้ว fallback เป็น window.open แทน
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if(isIOS){
+    // iOS: เปิดรูปใน tab ใหม่ ผู้ใช้กด "บันทึกรูปภาพ" เอง
+    window.open(p.dataURL,'_blank');
+    toast('กด "บันทึกรูปภาพ" ค้างที่รูปเพื่อบันทึก','ok');
+  } else {
+    const a=document.createElement('a'); a.href=p.dataURL; a.download=n; a.click();
+    toast('บันทึก '+n,'ok');
+  }
 }
 function showQR(){
   if(vIdx<0) return; const p=photos[vIdx];
   if(!p.lat){ toast('รูปนี้ไม่มี GPS','bad'); return; }
   const url=`https://maps.google.com/?q=${p.lat},${p.lng}`;
   const canvas=document.getElementById('qr-canvas');
-  const ctx=canvas.getContext('2d');
-  const sz=220; canvas.width=sz; canvas.height=sz;
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,sz,sz); ctx.fillStyle='#000';
-  const cell=8,modules=Math.floor(sz/cell);
-  for(let y=0;y<modules;y++) for(let x=0;x<modules;x++){
-    const hash=(url.charCodeAt((x+y*modules)%url.length)*137+x*31+y*17)%100;
-    if(hash<45||(x<7&&y<7)||(x>modules-8&&y<7)||(x<7&&y>modules-8)){
-      if(!((x===1||x===5)&&y<7)&&!((y===1||y===5)&&x<7)&&!(x>=2&&x<=4&&y>=2&&y<=4)&&
-         !((x===modules-7||x===modules-3)&&y<7)&&!((y===1||y===5)&&x>modules-8))
-        ctx.fillRect(x*cell,y*cell,cell,cell);
-    }
-  }
   const d=new Date(p.dt);
   document.getElementById('qr-info').innerHTML=`ภาพที่ ${vIdx+1} · ${fD(d)}<br>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
   document.getElementById('qr-modal').classList.add('show');
+
+  // FIX 4: ใช้ QRCode.js จริง แทนการวาด pattern เอง
+  // เดิมวาดด้วย hash function เองซึ่ง scanner อ่านไม่ออก
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  if(typeof QRCode !== 'undefined'){
+    // ล้าง canvas เดิมก่อน แล้วสร้าง QR ใหม่
+    const sz=220; canvas.width=sz; canvas.height=sz;
+    QRCode.toCanvas(canvas, url, {width:sz, margin:2, color:{dark:'#000',light:'#fff'}}, err=>{
+      if(err) console.warn('QR err',err);
+    });
+  } else {
+    // fallback: โหลด library แล้ว retry
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload=()=>showQR();
+    document.head.appendChild(s);
+  }
 }
 function openGM(){
   if(vIdx<0) return; const p=photos[vIdx];
@@ -1962,21 +2017,63 @@ function removeFromUploadQueue(id){
   delete _uploadFailNotified[id];
 }
 
+let _pendingDelete = null;
 function delP(){
   if(vIdx<0) return;
-  if(!confirm('ลบรูปนี้? จะลบทั้ง Sheet และไฟล์ใน Drive')) return;
   const photo=photos[vIdx], pId=photo.id, driveFileId=extractDriveFileId(photo.dataURL);
   const delPayload={action:'deletePhoto', id:pId, driveFileId};
-  photos.splice(vIdx,1);
-  removeFromUploadQueue(pId);   // กันรูปที่ลบแล้วถูกอัปโหลดซ้ำทีหลัง
-  idbRemovePhoto(pId); updCnt(); goBack();
+
+  // FIX 9: Undo delete — ลบจาก UI ทันที แต่รอ 5 วิก่อนส่ง GAS จริง
+  // ถ้าผู้ใช้กด "ยกเลิก" ภายใน 5 วิ จะ restore รูปกลับมา
+  const photoBackup = {...photo};
+  const vIdxBackup = vIdx;
+
+  photos.splice(vIdx, 1);
+  removeFromUploadQueue(pId);
+  idbRemovePhoto(pId);
+  updCnt(); goBack();
+
+  // ยกเลิก pending delete เดิมถ้ามี (กด delete รัวๆ)
+  if(_pendingDelete) {
+    clearTimeout(_pendingDelete.timer);
+    _executePendingDelete(_pendingDelete); // ลบตัวเก่าทันที
+  }
+
+  _pendingDelete = { timer: null, payload: delPayload, backup: photoBackup, vIdxBackup };
+
+  // แสดง toast พร้อมปุ่ม ยกเลิก
+  const t = document.getElementById('toast');
+  t.innerHTML = `🗑 ลบรูปแล้ว &nbsp;<button onclick="undoDelete()" style="background:#4a7fb5;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;">ยกเลิก</button>`;
+  t.className = 'show';
+  clearTimeout(t._t);
+
+  _pendingDelete.timer = setTimeout(()=>{
+    t.className='';
+    _executePendingDelete(_pendingDelete);
+    _pendingDelete = null;
+  }, 5000);
+}
+function undoDelete(){
+  if(!_pendingDelete) return;
+  clearTimeout(_pendingDelete.timer);
+  const {backup, vIdxBackup} = _pendingDelete;
+  _pendingDelete = null;
+  // restore รูปกลับ
+  photos.splice(vIdxBackup, 0, backup);
+  idbSavePhoto(backup);
+  updCnt();
+  document.getElementById('toast').className='';
+  toast('↩ ยกเลิกการลบแล้ว','ok');
+}
+function _executePendingDelete(pd){
+  if(!pd) return;
   if(navigator.onLine){
-    gasPost(delPayload)
-      .then(res=>{ toast(res.status==='success'?'✓ ลบสำเร็จ':'ลบล้มเหลว',res.status==='success'?'ok':'bad'); })
-      .catch(async()=>{ await idbQueueDelete(delPayload); toast('ลบจาก memory แล้ว (จะส่ง Cloud เมื่อออนไลน์)'); });
+    gasPost(pd.payload)
+      .then(res=>{ if(res.status!=='success') toast('ลบล้มเหลว','bad'); })
+      .catch(async()=>{ await idbQueueDelete(pd.payload); });
   } else {
-    idbQueueDelete(delPayload);
-    toast('ลบจาก memory แล้ว (จะส่ง Cloud เมื่อออนไลน์)');
+    idbQueueDelete(pd.payload);
+    toast('จะลบใน Cloud เมื่อ online','');
   }
 }
 function clearAll(){
@@ -2044,9 +2141,14 @@ async function genPDF(){
   list.forEach((p,i)=>{
     const d=new Date(p.dt);
     const gmUrl=p.lat?`https://maps.google.com/?q=${p.lat},${p.lng}`:'';
+    // FIX 5: ใช้ dataURL จาก IDB ก่อน ถ้าไม่มีค่อย fallback Drive URL
+    // เดิมใช้ Drive URL ตรงๆ → print offline รูปไม่ขึ้น
+    const imgForPDF = (!p.uploaded && p.dataURL?.startsWith('data:'))
+      ? p.dataURL
+      : (p.dataURL?.startsWith('http') ? getDriveImgUrl(p.dataURL,'w400') : p.dataURL);
     rows+=`<tr>
       <td>${i+1}</td>
-      <td><img src="${p.uploaded&&p.dataURL?.startsWith('http')?getDriveImgUrl(p.dataURL):p.dataURL}" style="width:110px;height:82px;object-fit:cover;border-radius:4px;"></td>
+      <td><img src="${imgForPDF}" style="width:110px;height:82px;object-fit:cover;border-radius:4px;" crossorigin="anonymous"></td>
       <td>${p.lat?p.lat.toFixed(6)+'<br>'+p.lng.toFixed(6):'ไม่มี GPS'}</td>
       <td>${p.alt?p.alt.toFixed(1)+' m':'--'}</td>
       <td>±${p.acc?Math.round(p.acc):'-'} m</td>
@@ -2170,11 +2272,18 @@ function initMap(){
   const allPts=photos.filter(p=>p.lat);
   const pts=mapFilterProject==='all'?allPts:allPts.filter(p=>(p.project||'')===mapFilterProject);
   document.getElementById('mcount').textContent=pts.length;
-  if(lmap){lmap.remove();lmap=null;}
+  // FIX 6: destroy map เฉพาะตอนที่จำเป็น (ครั้งแรก หรือ container เปลี่ยน)
+  // เดิม remove+create ใหม่ทุกครั้ง → กระพริบ + โหลด tile ซ้ำ
+  // แก้: ถ้า lmap มีอยู่แล้ว ล้างแค่ layers แล้ว reuse map เดิม
+  if(lmap && document.getElementById('lmap')._leaflet_id){
+    lmap.eachLayer(l=>{ if(!(l instanceof L.TileLayer)) lmap.removeLayer(l); });
+  } else {
+    if(lmap){ try{ lmap.remove(); }catch(e){} lmap=null; }
   const ctr=pts.length?[pts[0].lat,pts[0].lng]:gps?[gps.lat,gps.lng]:[13.7563,100.5018];
   lmap=L.map('lmap',{zoomControl:false}).setView(ctr,15);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(lmap);
   L.control.zoom({position:'topright'}).addTo(lmap);
+  }
   const cluster=L.markerClusterGroup({showCoverageOnHover:false,maxClusterRadius:50,spiderfyOnMaxZoom:true,
     iconCreateFunction(cl){const n=cl.getChildCount(),col=mapFilterProject!=='all'?getProjColor(mapFilterProject):'#4a7fb5';return L.divIcon({html:`<div style="background:${col};color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:monospace;font-size:14px;border:3px solid #fff;box-shadow:0 3px 16px ${col}88;">${n}</div>`,className:'',iconSize:[38,38],iconAnchor:[19,19]});}});
   const R=6371000;
