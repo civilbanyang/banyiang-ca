@@ -1079,7 +1079,11 @@ async function loadFromIDB(){
   if(all.length){
     photos = all.sort((a,b)=>new Date(b.dt)-new Date(a.dt));
     const pending = photos.filter(p=>!p.uploaded && p.dataURL?.startsWith('data:'));
-    for(const p of pending) _uploadQueue.push(p);
+    // FIX 3: กัน push queue ซ้ำ — ถ้าเรียก loadFromIDB ซ้ำ (sync fail/retry)
+    // เดิมจะ push รูปเดิมซ้ำ → รูปเดียวกันอยู่ใน queue หลายตัว upload หลายครั้ง
+    for(const p of pending){
+      if(!_uploadQueue.find(x=>x.id===p.id)) _uploadQueue.push(p);
+    }
   }
 }
 
@@ -1246,10 +1250,17 @@ function addProjectFromSettings(){
 }
 function deleteProject(name){
   const cnt = photos.filter(p=>p.project===name).length;
-  const msg = cnt > 0
-    ? `ลบโครงการ "${name}" ?\n\nมีรูป ${cnt} รูปในโครงการนี้\nจะลบรูปทั้งหมด + โฟลเดอร์ใน Drive ด้วย`
-    : `ลบโครงการ "${name}" ?\n\nจะลบโฟลเดอร์ใน Drive ด้วย`;
-  if(!confirm(msg)) return;
+  // FIX 5: เปลี่ยนจาก confirm() เป็น custom modal
+  // confirm() บน iOS PWA บางตัวไม่แสดง หรือ block UI thread
+  _showConfirmModal(
+    `ลบโครงการ "${name}"?`,
+    cnt>0
+      ? `มีรูป ${cnt} รูปในโครงการนี้\nจะลบรูปทั้งหมด + โฟลเดอร์ใน Drive ด้วย`
+      : `จะลบโฟลเดอร์ใน Drive ด้วย`,
+    ()=>_doDeleteProject(name)
+  );
+}
+function _doDeleteProject(name){
   projects = projects.filter(p=>p!==name);
   // ถอดรูปของโครงการนี้ที่ยังค้างใน upload queue ออกด้วย — เหตุผลเดียว
   // กับ delP()/clearAll(): กันรูปที่ถูกลบไปพร้อมโครงการ แต่ยังค้างรอ
@@ -1278,6 +1289,39 @@ function deleteProject(name){
     toast('ลบจาก memory แล้ว (จะซิงค์ Cloud เมื่อออนไลน์)','');
   }
 }
+} // end _doDeleteProject
+
+// FIX 5: helper สำหรับ custom confirm modal
+let _confirmCallback = null;
+function _showConfirmModal(title, msg, onConfirm){
+  _confirmCallback = onConfirm;
+  const m = document.getElementById('confirm-modal');
+  if(!m){
+    // สร้าง modal ถ้ายังไม่มี
+    const el = document.createElement('div');
+    el.id='confirm-modal';
+    el.style.cssText='display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.7);align-items:center;justify-content:center;';
+    el.innerHTML=`<div style="background:#1c2128;border:1px solid #2a3340;border-radius:16px;padding:24px;width:88%;max-width:340px;text-align:center;">
+      <div id="cm-title" style="color:#e0e8f0;font-size:15px;font-weight:bold;margin-bottom:10px;"></div>
+      <div id="cm-msg" style="color:#7fa8d4;font-size:12px;line-height:1.7;white-space:pre-line;margin-bottom:20px;"></div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button onclick="_closeConfirmModal(false)" style="flex:1;padding:10px;border-radius:8px;border:1px solid #2a3340;background:#0d1117;color:#7fa8d4;font-size:13px;cursor:pointer;">ยกเลิก</button>
+        <button onclick="_closeConfirmModal(true)" style="flex:1;padding:10px;border-radius:8px;border:none;background:#c97a7a;color:#fff;font-size:13px;font-weight:bold;cursor:pointer;">ลบ</button>
+      </div>
+    </div>`;
+    document.body.appendChild(el);
+  }
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('cm-title').textContent = title;
+  document.getElementById('cm-msg').textContent = msg;
+  modal.style.display='flex';
+}
+function _closeConfirmModal(confirmed){
+  document.getElementById('confirm-modal').style.display='none';
+  if(confirmed && _confirmCallback) _confirmCallback();
+  _confirmCallback = null;
+}
+
 function renderProjSetList(){
   const el=document.getElementById('proj-set-list'); if(!el) return;
   if(!projects.length){ el.innerHTML='<div style="color:var(--t2);font-size:11px;padding:8px 2px;">ยังไม่มีโครงการ</div>'; return; }
@@ -1701,12 +1745,24 @@ async function _drawMiniMap(ctx, ug, fSz, mapSz, mapX, mapY){
       const txN = tileX+dx, tyN = tileY+dy;
       const px  = (dx+1)*TILE, py = (dy+1)*TILE;
       const s   = servers[Math.floor(Math.random()*3)];
+      const tileKey=`${zoom}/${txN}/${tyN}`;
       loads.push(new Promise(res=>{
+        // FIX 6: cache tile ใน memory — ถ่ายต่อเนื่องในพื้นที่เดิมไม่โหลดซ้ำ
+        if(_tileMemCache[tileKey]){
+          tx.drawImage(_tileMemCache[tileKey],px,py,TILE,TILE); res(); return;
+        }
         const img = new Image(); img.crossOrigin='anonymous';
-        img.onload  = ()=>{ tx.drawImage(img,px,py,TILE,TILE); res(); };
+        img.onload  = ()=>{
+          _tileMemCache[tileKey]=img;  // เก็บ image object ไว้ใช้ซ้ำ
+          // ถ้า cache ใหญ่เกิน 200 entries ลบเก่าสุดออก
+          const keys=Object.keys(_tileMemCache);
+          if(keys.length>200) delete _tileMemCache[keys[0]];
+          tx.drawImage(img,px,py,TILE,TILE); res();
+        };
         img.onerror = ()=>res();
         img.src = `https://${s}.tile.openstreetmap.org/${zoom}/${txN}/${tyN}.png`;
-        setTimeout(res, 4500);
+        // FIX 2: ลด timeout 4500ms → 1500ms — หน้างานถ้า tile ไม่ขึ้นใน 1.5s ก็ถ่ายได้เลย
+        setTimeout(res, 1500);
       }));
     }
   }
@@ -1805,10 +1861,17 @@ async function syncAllUnuploaded(){
   const pending=photos.filter(p=>!p.uploaded);
   if(!pending.length){ toast('รูปทั้งหมดอัปโหลดแล้ว ✅','ok'); return; }
   if(!navigator.onLine){ toast('กรุณาเชื่อมต่ออินเทอร์เน็ตก่อน','bad'); return; }
-  if(!confirm(`มีรูปที่ยังไม่ได้อัปโหลด ${pending.length} รูป ต้องการส่งตอนนี้?`)) return;
-  for(const p of pending) if(!_uploadQueue.find(x=>x.id===p.id)) _uploadQueue.push(p);
-  _uploading=false;
-  processQueue();
+  // FIX 5: ใช้ custom modal แทน confirm() — iOS PWA safe
+  _showConfirmModal(
+    `อัปโหลด ${pending.length} รูป?`,
+    'ต้องการส่งรูปที่ยังค้างอยู่ขึ้น Cloud ตอนนี้?',
+    ()=>{
+      for(const p of pending) if(!_uploadQueue.find(x=>x.id===p.id)) _uploadQueue.push(p);
+      _uploading=false;
+      processQueue();
+      toast(`⏳ กำลังส่ง ${pending.length} รูป...`);
+    }
+  );
 }
 async function flushPendingQueue(){
   await flushDeleteQueue();
@@ -1869,6 +1932,10 @@ function getFilteredPhotos(){
   return photos.filter(p=>p.project === photoFilterProject);
 }
 
+// FIX 1: renderPhotos — เปรียบเทียบ key ก่อนสร้าง DOM ใหม่
+// เดิม: สร้าง DOM ใหม่ทั้งหมดทุกครั้ง → กระตุก + scroll กลับบนสุด
+// แก้: ถ้า filtered เหมือนเดิม (key ตรง) ข้ามไป ไม่ rebuild
+let _lastPhotoKeys = '';
 function renderPhotos(){
   const g=document.getElementById('pgrid');
   updCnt();
@@ -1879,13 +1946,18 @@ function renderPhotos(){
     ? `${photos.length} รูป`
     : `${filtered.length} / ${photos.length} รูป`;
   if(!filtered.length){
+    _lastPhotoKeys='';
     g.innerHTML = photos.length
       ? '<div class="emp"><span class="emp-icon">🔍</span>ไม่มีรูปในโครงการนี้</div>'
       : '<div class="emp"><span class="emp-icon">📷</span>ยังไม่มีรูปภาพ<br>กดปุ่มถ่ายภาพเพื่อเริ่มต้น</div>';
     return;
   }
+  // สร้าง key จาก id+uploaded status — ถ้าเหมือนเดิมไม่ต้อง rebuild
+  const newKeys = filtered.map(p=>p.id+':'+p.uploaded).join('|');
+  if(newKeys === _lastPhotoKeys) return;
+  _lastPhotoKeys = newKeys;
+
   g.innerHTML=filtered.map((p,i)=>{
-    // หา index จริงใน photos[] เพื่อให้ openV() ทำงานถูก
     const realIdx = photos.indexOf(p);
     const d=new Date(p.dt);
     const isLocal = !p.uploaded && p.dataURL?.startsWith('data:');
@@ -2077,7 +2149,14 @@ function _executePendingDelete(pd){
   }
 }
 function clearAll(){
-  if(!confirm(`ลบรูปทั้งหมด ${photos.length} รูป?`)) return;
+  // FIX 5: ใช้ custom modal แทน confirm()
+  _showConfirmModal(
+    `ลบรูปทั้งหมด ${photos.length} รูป?`,
+    'จะลบทั้ง Sheet และไฟล์ใน Drive ทั้งหมด ไม่สามารถกู้คืนได้',
+    _doClearAll
+  );
+}
+function _doClearAll(){
   const driveFileIds=photos.map(p=>extractDriveFileId(p.dataURL)).filter(Boolean);
   // ล้าง upload queue ทั้งหมดด้วย — เหตุผลเดียวกับ delP(): รูปที่ยังค้าง
   // รออัปโหลดอยู่ตอนกด "ลบทั้งหมด" ต้องไม่ถูกส่งขึ้น Cloud อีกทีหลัง
@@ -2090,7 +2169,7 @@ function clearAll(){
       .then(res=>{ toast(res.status==='success'?'✓ ลบทั้งหมดสำเร็จ':'ล้าง Sheet แล้ว Drive อาจมีปัญหา',res.status==='success'?'ok':'bad'); })
       .catch(()=>toast('ล้างข้อมูลแล้ว'));
   }
-}
+} // end _doClearAll
 
 /* ================================================================
    EXPORT
@@ -2222,6 +2301,7 @@ function doCSV(){
 /* ================================================================
    MAP
 ================================================================ */
+let _tileMemCache = {};  // FIX 6: in-memory tile cache กัน download ซ้ำ
 let _popupGroups={},_popupIdxMap={};
 const PROJ_COLORS=['#4a7fb5','#e8a23d','#7a9e7e','#b08bc9','#c97a7a','#5fa3a3','#c9a05f'];
 let _projColorMap={};
@@ -2317,15 +2397,37 @@ function initMap(){
 /* ================================================================
    ONLINE/OFFLINE
 ================================================================ */
+function _updateNetworkUI(online){
+  const el=document.getElementById('offline-status');
+  if(!el) return;
+  // FIX 4: เปลี่ยนสีให้เห็นชัดหน้างาน แทนแค่ข้อความเล็กๆ
+  // online = เขียว, offline = แดง พร้อมขยายตัวอักษรขึ้นอีกนิด
+  if(online){
+    el.textContent='● online';
+    el.style.color='#7ee8a8';
+    el.style.fontWeight='bold';
+  } else {
+    el.textContent='📴 offline';
+    el.style.color='#ff9e5e';
+    el.style.fontWeight='bold';
+    el.style.animation='_netpulse 1s ease-in-out infinite alternate';
+  }
+}
+// inject pulse animation ครั้งเดียวตอนโหลด
+(function(){
+  const s=document.createElement('style');
+  s.textContent='@keyframes _netpulse{from{opacity:1}to{opacity:.4}}';
+  document.head.appendChild(s);
+})();
 window.addEventListener('online', ()=>{
-  document.getElementById('offline-status').textContent='online';
-  toast('กลับมา online — ส่งข้อมูลค้าง...');
+  _updateNetworkUI(true);
+  toast('● กลับมา online — ส่งข้อมูลค้าง...','ok');
   flushDeleteQueue();
   processQueue();
 });
 window.addEventListener('offline', ()=>{
-  document.getElementById('offline-status').textContent='📴 offline';
-  toast('อยู่ในโหมด offline — รูปจะบันทึกใน IndexedDB','bad');
+  _updateNetworkUI(false);
+  toast('📴 offline — รูปจะบันทึกในเครื่อง','bad');
 });
 
 /* ================================================================
@@ -2371,6 +2473,7 @@ window.addEventListener('load', async ()=>{
 });
 function finishInit(){
   loadSettingsUI(); startCam('environment'); startGPS(); startClock(); updCnt();
+  _updateNetworkUI(navigator.onLine); // FIX 4: set initial network color
   // ถามเลือกโครงการเฉพาะตอนยังไม่มีโครงการตั้งไว้ — ถ้าเลือกไว้แล้วจากครั้งก่อน
   // ไม่ต้องถามซ้ำทุกครั้งที่เปิดแอป (รบกวนผู้ใช้หน้างานโดยไม่จำเป็น)
   if(!cfg.project){
