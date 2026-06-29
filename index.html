@@ -198,13 +198,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 .ab:disabled{opacity:.4;cursor:not-allowed;}
 
 /* MAP */
-#mcon{flex:1;position:relative;overflow:hidden;}
-#lmap{width:100%;height:100%;}
-.mleg{position:absolute;bottom:16px;left:12px;z-index:1000;background:rgba(21,25,31,.88);border:1px solid var(--br2);border-radius:10px;padding:8px 12px;font-size:9px;color:var(--t2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 .mleg b{color:var(--ac);}
-#map-filter-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 90px);padding:0 4px;}
-.mf-chip{background:rgba(28,33,40,.9);border:1px solid rgba(255,255,255,.1);color:var(--t2);font-family:var(--fn);font-size:9px;font-weight:600;padding:5px 11px;border-radius:16px;cursor:pointer;backdrop-filter:blur(8px);white-space:nowrap;transition:all .15s;}
-.mf-chip.active{background:var(--ad);border-color:var(--ag);color:var(--ac);}
 
 /* EXPORT PAGE */
 .exp-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;}
@@ -273,26 +267,9 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 .proj-set-del{background:transparent;border:none;color:var(--dn);font-size:14px;cursor:pointer;padding:2px 6px;opacity:.7;}
 .proj-set-del:active{opacity:1;}
 
-/* LEAFLET OVERRIDES */
-.leaflet-popup-content-wrapper{background:#252b33!important;border:1px solid rgba(74,127,181,.3)!important;border-radius:14px!important;box-shadow:0 8px 40px rgba(0,0,0,.7)!important;padding:0!important;}
-.leaflet-popup-content{margin:0!important;width:220px!important;}
-.leaflet-popup-tip{background:#252b33!important;}
-.leaflet-popup-close-button{color:#838d99!important;top:8px!important;right:8px!important;font-size:16px!important;}
+
 .survey-marker{background:#4a7fb5;color:#fff;font-size:9px;font-weight:700;font-family:monospace;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,.5);}
 .survey-marker span{transform:rotate(45deg);}
-.pop-wrap{padding:11px;}
-.pop-img{width:100%;height:128px;object-fit:cover;border-radius:10px 10px 0 0;display:block;}
-.pop-badge{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
-.pop-num{background:rgba(74,127,181,.16);color:#7fa8d4;font-size:9px;font-weight:700;padding:3px 8px;border-radius:16px;border:1px solid rgba(74,127,181,.3);}
-.pop-sync{font-size:12px;}
-.pop-row{font-size:9.5px;color:#838d99;margin-bottom:3px;display:flex;gap:5px;}
-.pop-row b{color:#c9d1d9;font-weight:600;}
-.pop-divider{border:none;border-top:1px solid rgba(255,255,255,.07);margin:7px 0;}
-.pop-btn{display:block;width:100%;padding:7px;border-radius:8px;border:1px solid rgba(74,127,181,.3);background:rgba(74,127,181,.1);color:#7fa8d4;font-family:monospace;font-size:9px;text-align:center;text-decoration:none;}
-.pop-nav{display:flex;gap:5px;margin-top:6px;}
-.pop-nav-btn{flex:1;padding:7px;border-radius:8px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);color:#838d99;font-family:monospace;font-size:9px;cursor:pointer;text-align:center;}
-.pop-nav-btn:active{background:rgba(74,127,181,.14);color:#7fa8d4;border-color:rgba(74,127,181,.35);}
-.pop-multi-header{background:rgba(232,162,61,.1);border-bottom:1px solid rgba(232,162,61,.2);padding:7px 11px;border-radius:14px 14px 0 0;color:#e8a23d;font-size:9px;font-weight:700;text-align:center;}
 
 #cvs{display:none;}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:999;transition:opacity .05s;}
@@ -382,9 +359,6 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
       </button>
       <button class="ntab" onclick="goPg('photos');switchTab(this,'photos')">
         <span class="ni">🗂</span><span class="nl">รูป&nbsp;<span id="ncount">0</span></span>
-      </button>
-      <button class="ntab" onclick="goPg('map');switchTab(this,'map')">
-        <span class="ni">🗺</span><span class="nl">แผนที่</span>
       </button>
       <button class="ntab" onclick="goPg('export');switchTab(this,'export')">
         <span class="ni">📤</span><span class="nl">ส่งออก</span>
@@ -593,17 +567,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
   </div>
 
   <!-- MAP -->
-  <div id="pg-map" class="page">
-    <div class="ph">
-      <span class="pt">🗺 แผนที่สำรวจ</span>
-      <button class="bk" onclick="goBack()">← กลับ</button>
-    </div>
-    <div id="mcon">
-      <div id="map-filter-bar"></div>
-      <div id="lmap"></div>
-      <div class="mleg"><b id="mcount">0</b> จุด · <span id="offline-status">online</span></div>
-    </div>
-  </div>
+  <span id="offline-status" style="display:none;"></span>
 
 </div><!-- /app -->
 
@@ -646,11 +610,7 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
 <div id="toast"></div>
 <div id="upload-progress" style="display:none;position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1c2128;color:#7fa8d4;padding:6px 16px;border-radius:20px;font-size:12px;font-family:monospace;z-index:9999;border:1px solid #2a3340;box-shadow:0 2px 12px rgba(0,0,0,.5);align-items:center;gap:8px;"></div>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<!-- Leaflet ถูกลบออกแล้ว — ไม่ได้ใช้หน้าแผนที่ -->
 
 <script>
 'use strict';
@@ -661,7 +621,7 @@ const APP_TOKEN = 'scam5-banyang-2025';
 ================================================================ */
 let photos = [], gps = null, bestGps = null, gpsHist = [];
 let facing = 'environment', stream = null, zLv = 1, zCaps = null;
-let stack = [], vIdx = -1, lmap = null;
+let stack = [], vIdx = -1;
 let timerRunning = false, lockPending = false;
 let _gpsWatchId = null, _gpsPollTimer = null, _gpsPollActive = false;
 
@@ -669,7 +629,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbzWbAhq8JDC6pjaMesTBQxX
 
 let cfg = { grid:false, timer:0, res:'4k', gpsThresh:15, qr:false, project:'' };
 let projects = [];
-let mapFilterProject = 'all';
 let photoFilterProject = 'all';   // filter หน้า photos
 let expFilterProject = 'all';
 
@@ -1340,7 +1299,6 @@ function goPg(name){
   stack.push(name);
   document.getElementById('pg-'+name)?.classList.add('active');
   if(name==='photos') renderPhotos();
-  if(name==='map') initMap();
   if(name==='export'){ updCnt(); updateExpFilterChips(); updateExpCountLabel(); }
   // FIX 3: หยุดกล้องเมื่อออกจากหน้า cam — เดิมกล้องเปิดค้างทุกหน้า
   // กิน battery + ไฟกล้องติดตลอดแม้ไม่ได้ใช้
@@ -1761,8 +1719,8 @@ async function _drawMiniMap(ctx, ug, fSz, mapSz, mapX, mapY){
         };
         img.onerror = ()=>res();
         img.src = `https://${s}.tile.openstreetmap.org/${zoom}/${txN}/${tyN}.png`;
-        // FIX 2: ลด timeout 4500ms → 1500ms — หน้างานถ้า tile ไม่ขึ้นใน 1.5s ก็ถ่ายได้เลย
-        setTimeout(res, 1500);
+        // แก้ timeout เป็น 3000ms — รอ tile ครบก่อน ไม่ให้มีช่องดำบนรูป
+        setTimeout(res, 3000);
       }));
     }
   }
@@ -2256,7 +2214,8 @@ th{background:#1c2128;color:#7fa8d4;padding:10px 8px;font-size:10px;letter-spaci
 td{padding:8px;border-bottom:1px solid #f1f5f9;font-size:11px;vertical-align:middle;}tr:last-child td{border-bottom:none;}
 a{color:#3b82f6;}.map-wrap{height:300px;border-radius:10px;overflow:hidden;margin:20px 0;border:1px solid #e2e8f0;}
 @media print{body{padding:0;}.header{border-radius:0;}}
-</style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</style><!-- Leaflet ใน template นี้ใช้แค่ใน exported HTML report ไม่ใช่ app -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head><body>
 <div class="header"><h1>📊 รายงานสำรวจ</h1><div class="sub">โครงการ: ${projLabel} · ${fD(now)} ${fT(now)}</div></div>
 <div class="stats">
@@ -2301,116 +2260,27 @@ function doCSV(){
 /* ================================================================
    MAP
 ================================================================ */
-let _tileMemCache = {};  // FIX 6: in-memory tile cache กัน download ซ้ำ
-let _popupGroups={},_popupIdxMap={};
-const PROJ_COLORS=['#4a7fb5','#e8a23d','#7a9e7e','#b08bc9','#c97a7a','#5fa3a3','#c9a05f'];
-let _projColorMap={};
-function getProjColor(proj){
-  if(!proj) return '#4a7fb5';
-  if(!_projColorMap[proj]){const k=Object.keys(_projColorMap);_projColorMap[proj]=PROJ_COLORS[k.length%PROJ_COLORS.length];}
-  return _projColorMap[proj];
-}
-function getImgSrc(p){return p.uploaded&&p.dataURL?.startsWith('http')?getDriveThumb(p.dataURL):p.dataURL;}
-function renderPopupInto(el,group,idx){
-  const item=group[idx],p=item.p,d=new Date(p.dt),count=group.length,imgSrc=getImgSrc(p),projColor=getProjColor(p.project);
-  let html='';
-  if(count>1) html+=`<div class="pop-multi-header" style="background:${projColor}15;border-color:${projColor}30;color:${projColor};">📍 ${count} ภาพ · ${idx+1}/${count}</div>`;
-  html+=`<img class="pop-img" src="${imgSrc}" onerror="this.style.opacity=0.3">`;
-  html+=`<div class="pop-wrap"><div class="pop-badge"><span class="pop-num">📷 #${item.originalIndex}</span><span class="pop-sync">${p.uploaded?'☁':'⏳'}</span></div>`;
-  html+=`<div class="pop-row">🕐 <b>${fD(d)} ${fT(d)}</b></div>`;
-  if(p.lat) html+=`<div class="pop-row">📍 <b>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</b></div>`;
-  if(p.acc) html+=`<div class="pop-row">🎯 ±<b>${Math.round(p.acc)} m</b></div>`;
-  if(p.alt) html+=`<div class="pop-row">⬆️ <b>${p.alt.toFixed(1)} m</b></div>`;
-  if(p.project?.trim()) html+=`<div class="pop-row">🏗 <b>${p.project}</b></div>`;
-  if(p.lat) html+=`<hr class="pop-divider"><a class="pop-btn" href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank">🗺 เปิด Google Maps</a>`;
-  if(count>1) html+=`<div class="pop-nav"><button class="pop-nav-btn" data-dir="-1" ${idx===0?'disabled':''}>◀ ก่อนหน้า</button><button class="pop-nav-btn" data-dir="1" ${idx===count-1?'disabled':''}>ถัดไป ▶</button></div>`;
-  html+=`</div>`;
-  el.innerHTML=html;
-  if(count>1) el.querySelectorAll('.pop-nav-btn').forEach(btn=>{
-    L.DomEvent.on(btn,'click',function(e){
-      L.DomEvent.stopPropagation(e);L.DomEvent.preventDefault(e);
-      const dir=parseInt(this.dataset.dir),mid=el.dataset.mid,g=_popupGroups[mid];
-      let ni=(_popupIdxMap[mid]||0)+dir; ni=Math.max(0,Math.min(g.length-1,ni));
-      _popupIdxMap[mid]=ni; renderPopupInto(el,g,ni);
-    },btn);
-  });
-}
-function renderMapFilterBar(){
-  const bar=document.getElementById('map-filter-bar'); if(!bar) return;
-  const allProjs=[...new Set(photos.filter(p=>p.lat&&p.project?.trim()).map(p=>p.project.trim()))].sort();
-  const totalGps=photos.filter(p=>p.lat).length;
-  let html=`<span class="mf-chip${mapFilterProject==='all'?' active':''}" onclick="setMapFilter('all')">ทั้งหมด <b>${totalGps}</b></span>`;
-  allProjs.forEach(pj=>{
-    const safe=pj.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    html+=`<span class="mf-chip${mapFilterProject===pj?' active':''}" onclick="setMapFilter('${safe}')">${pj} <b>${photos.filter(p=>p.lat&&p.project===pj).length}</b></span>`;
-  });
-  bar.innerHTML=html;
-}
-function setMapFilter(proj){mapFilterProject=proj;initMap();}
-function initMap(){
-  renderMapFilterBar();
-  const allPts=photos.filter(p=>p.lat);
-  const pts=mapFilterProject==='all'?allPts:allPts.filter(p=>(p.project||'')===mapFilterProject);
-  document.getElementById('mcount').textContent=pts.length;
-  // FIX 6: destroy map เฉพาะตอนที่จำเป็น (ครั้งแรก หรือ container เปลี่ยน)
-  // เดิม remove+create ใหม่ทุกครั้ง → กระพริบ + โหลด tile ซ้ำ
-  // แก้: ถ้า lmap มีอยู่แล้ว ล้างแค่ layers แล้ว reuse map เดิม
-  if(lmap && document.getElementById('lmap')._leaflet_id){
-    lmap.eachLayer(l=>{ if(!(l instanceof L.TileLayer)) lmap.removeLayer(l); });
-  } else {
-    if(lmap){ try{ lmap.remove(); }catch(e){} lmap=null; }
-  const ctr=pts.length?[pts[0].lat,pts[0].lng]:gps?[gps.lat,gps.lng]:[13.7563,100.5018];
-  lmap=L.map('lmap',{zoomControl:false}).setView(ctr,15);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(lmap);
-  L.control.zoom({position:'topright'}).addTo(lmap);
-  }
-  const cluster=L.markerClusterGroup({showCoverageOnHover:false,maxClusterRadius:50,spiderfyOnMaxZoom:true,
-    iconCreateFunction(cl){const n=cl.getChildCount(),col=mapFilterProject!=='all'?getProjColor(mapFilterProject):'#4a7fb5';return L.divIcon({html:`<div style="background:${col};color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:monospace;font-size:14px;border:3px solid #fff;box-shadow:0 3px 16px ${col}88;">${n}</div>`,className:'',iconSize:[38,38],iconAnchor:[19,19]});}});
-  const R=6371000;
-  const dist=(a,b)=>{const dLat=(b[0]-a[0])*Math.PI/180,dLng=(b[1]-a[1])*Math.PI/180,s=Math.sin(dLat/2)**2+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));};
-  const photoTimeOrder=[...photos].reverse();
-  const groups=[];
-  pts.forEach(p=>{
-    const coord=[p.lat,p.lng],timeIdx=photoTimeOrder.findIndex(x=>x.id===p.id),seqNum=timeIdx>=0?timeIdx+1:photos.length;
-    const found=groups.find(g=>dist([g[0].p.lat,g[0].p.lng],coord)<5);
-    if(found) found.push({p,originalIndex:seqNum});
-    else groups.push([{p,originalIndex:seqNum}]);
-  });
-  groups.forEach(g=>g.sort((a,b)=>a.originalIndex-b.originalIndex));
-  groups.forEach((group,gi)=>{
-    const firstP=group[0].p,count=group.length,mid='mk_'+gi;
-    _popupGroups[mid]=group;_popupIdxMap[mid]=0;
-    const pColor=getProjColor(firstP.project);
-    const icon=L.divIcon({html:`<div class="survey-marker" style="background:${pColor};"><span style="transform:rotate(45deg);font-size:9px;font-weight:700;">${group[0].originalIndex}</span>${count>1?`<div style="position:absolute;top:-6px;right:-6px;background:#fff;color:#000;border-radius:50%;width:16px;height:16px;font-size:8px;display:flex;align-items:center;justify-content:center;border:2px solid ${pColor};font-weight:700;">${count}</div>`:''}</div>`,className:'',iconSize:[28,28],iconAnchor:[14,28]});
-    const popEl=document.createElement('div');popEl.dataset.mid=mid;renderPopupInto(popEl,group,0);
-    const popup=L.popup({maxWidth:240,minWidth:220,closeButton:true}).setContent(popEl);
-    const marker=L.marker([firstP.lat,firstP.lng],{icon});
-    marker.bindPopup(popup);marker.on('popupopen',()=>{_popupIdxMap[mid]=0;renderPopupInto(popEl,group,0);});
-    cluster.addLayer(marker);
-  });
-  lmap.addLayer(cluster);
-  if(pts.length>1){const ln=L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#4a7fb5',weight:2,opacity:.5,dashArray:'5 8'}).addTo(lmap);lmap.fitBounds(ln.getBounds(),{padding:[40,40]});}
-  if(gps) L.circleMarker([gps.lat,gps.lng],{radius:9,color:'#e8a23d',fillColor:'#e8a23d',fillOpacity:.35,weight:2.5}).addTo(lmap).bindPopup('<div style="font-family:monospace;font-size:10px;color:#e8a23d">📍 ตำแหน่งของคุณ</div>');
-  document.getElementById('offline-status').textContent=navigator.onLine?'online':'📴 offline';
-}
+let _tileMemCache = {};  // in-memory tile cache สำหรับ mini-map
+
+
+
+
 
 /* ================================================================
    ONLINE/OFFLINE
 ================================================================ */
 function _updateNetworkUI(online){
-  const el=document.getElementById('offline-status');
-  if(!el) return;
-  // FIX 4: เปลี่ยนสีให้เห็นชัดหน้างาน แทนแค่ข้อความเล็กๆ
-  // online = เขียว, offline = แดง พร้อมขยายตัวอักษรขึ้นอีกนิด
-  if(online){
-    el.textContent='● online';
-    el.style.color='#7ee8a8';
-    el.style.fontWeight='bold';
+  // offline-status ย้ายออกจากหน้าแผนที่แล้ว — แสดงผ่าน idb-status แทน
+  const idbEl = document.getElementById('idb-status');
+  if(!idbEl) return;
+  if(!online){
+    idbEl.style.borderColor='#ff9e5e';
+    idbEl.style.color='#ff9e5e';
+    idbEl.style.animation='_netpulse 1s ease-in-out infinite alternate';
   } else {
-    el.textContent='📴 offline';
-    el.style.color='#ff9e5e';
-    el.style.fontWeight='bold';
-    el.style.animation='_netpulse 1s ease-in-out infinite alternate';
+    idbEl.style.borderColor='';
+    idbEl.style.color='';
+    idbEl.style.animation='';
   }
 }
 // inject pulse animation ครั้งเดียวตอนโหลด
