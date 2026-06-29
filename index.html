@@ -289,6 +289,17 @@ html,body{background:var(--bg);color:var(--tx);font-family:var(--fn);height:100%
   </div>
   <div class="sring"></div>
   <div class="stxt">กำลังเชื่อมต่อฐานข้อมูล...</div>
+  <script>
+    // ROOT CAUSE FIX 3: safety timeout — ซ่อน splash ภายใน 5 วิเสมอ
+    // ป้องกัน edge case ที่ JS ค้างก่อนถึง finishInit()
+    setTimeout(function(){
+      var s=document.getElementById('splash');
+      if(s&&s.style.display!=='none'){
+        s.style.display='none';
+        console.warn('[SurveyCAM] splash timeout — force hide');
+      }
+    }, 5000);
+  </script>
 </div>
 
 <div id="app">
@@ -968,8 +979,16 @@ async function loadDataFromCloud(){
   // แก้:  Step 1) โหลด IDB (เร็ว <100ms) → finishInit() → ซ่อน splash ทันที
   //        Step 2) sync cloud ใน background → อัปเดต UI เงียบๆ
   // ผลลัพธ์: แอปพร้อมใช้งานใน <1 วิ เหมือนเดิม แม้เน็ตช้า
-  await loadFromIDB();
-  document.getElementById('splash').style.display='none';
+  // ROOT CAUSE FIX 2: ซ่อน splash เสมอ แม้ IDB จะ fail
+  // เดิม: ถ้า loadFromIDB throw → splash ค้างตลอด
+  try {
+    await loadFromIDB();
+  } catch(e) {
+    console.warn('[SurveyCAM] loadFromIDB error:', e);
+  }
+  // ซ่อน splash และเริ่มแอปเสมอ ไม่ว่า IDB จะสำเร็จหรือไม่
+  const splashEl = document.getElementById('splash');
+  if(splashEl) splashEl.style.display='none';
   finishInit();
 
   if(!navigator.onLine){
@@ -1034,12 +1053,21 @@ async function _syncCloudInBackground(){
 }
 
 async function loadFromIDB(){
+  // ROOT CAUSE FIX 4: ถ้า db ยังไม่พร้อม (openDB ใช้เวลา) รอสูงสุด 2 วิ
+  // เดิม: return ทันทีถ้า db=null → photos=[],queue=[] → แอปเปิดมาว่างเปล่า
+  if(!db){
+    let waited=0;
+    while(!db && waited<2000){
+      await new Promise(r=>setTimeout(r,100));
+      waited+=100;
+    }
+  }
+  if(!db) return; // ถ้ารอแล้วยังไม่ได้ → ข้ามไป (private mode / IDB ปิด)
   const all = await idbLoadAll();
   if(all.length){
     photos = all.sort((a,b)=>new Date(b.dt)-new Date(a.dt));
     const pending = photos.filter(p=>!p.uploaded && p.dataURL?.startsWith('data:'));
-    // FIX 3: กัน push queue ซ้ำ — ถ้าเรียก loadFromIDB ซ้ำ (sync fail/retry)
-    // เดิมจะ push รูปเดิมซ้ำ → รูปเดียวกันอยู่ใน queue หลายตัว upload หลายครั้ง
+    // กัน push queue ซ้ำ
     for(const p of pending){
       if(!_uploadQueue.find(x=>x.id===p.id)) _uploadQueue.push(p);
     }
@@ -2338,7 +2366,16 @@ document.addEventListener('visibilitychange', ()=>{
    INIT
 ================================================================ */
 window.addEventListener('load', async ()=>{
-  await openDB();
+  // ROOT CAUSE FIX: ถ้า openDB() fail (private mode / browser เก่า)
+  // splash จะค้างตลอดเพราะ loadDataFromCloud ไม่ถูกเรียก
+  // ใส่ try/catch กัน — ถ้า IDB ใช้ไม่ได้ก็ยังเปิดแอปได้ปกติ
+  try {
+    await openDB();
+  } catch(e) {
+    console.warn('[SurveyCAM] IndexedDB ใช้งานไม่ได้:', e);
+    // db จะยังเป็น null — idbSavePhoto/idbLoadAll จะ return เงียบๆ
+  }
+  // ไม่ว่า IDB จะพร้อมหรือเปล่า ต้องเรียก loadDataFromCloud เสมอ
   loadDataFromCloud();
 });
 function finishInit(){
