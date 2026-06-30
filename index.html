@@ -1276,7 +1276,6 @@ function _doDeleteProject(name){
     toast('ลบจาก memory แล้ว (จะซิงค์ Cloud เมื่อออนไลน์)','');
   }
 }
-} // end _doDeleteProject
 
 // FIX 5: helper สำหรับ custom confirm modal
 let _confirmCallback = null;
@@ -1328,26 +1327,20 @@ function goPg(name){
   document.getElementById('pg-'+name)?.classList.add('active');
   if(name==='photos') renderPhotos();
   if(name==='export'){ updCnt(); updateExpFilterChips(); updateExpCountLabel(); }
-  // FIX 3: หยุดกล้องเมื่อออกจากหน้า cam — เดิมกล้องเปิดค้างทุกหน้า
-  // กิน battery + ไฟกล้องติดตลอดแม้ไม่ได้ใช้
-  if(name!=='cam' && stream){
-    stream.getTracks().forEach(t=>t.stop());
-    stream=null;
-    const v=document.getElementById('video');
-    if(v) v.srcObject=null;
-  }
 }
 function goBack(){
   if(!stack.length) return;
   const name=stack.pop();
   document.getElementById('pg-'+name)?.classList.remove('active');
-  // FIX 3: กลับมาหน้า cam → restart กล้อง
   if(!stack.length){
-    switchTab(document.querySelector('.ntab'),'cam');
+    // กลับมาหน้า cam — ให้ switchTab จัดการกล้อง
+    const camTab = document.querySelector('.ntab');
+    if(camTab) switchTab(camTab,'cam');
+    // restart กล้องถ้ายังไม่มี stream
     if(!stream) startCam(facing);
   }
 }
-function switchTab(el,name){
+function switchTab(el, name){
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
 }
@@ -2354,11 +2347,9 @@ document.addEventListener('visibilitychange', ()=>{
     }
   } else {
     // ── กลับมา tab นี้ ────────────────────────────────────────
-    // เริ่ม GPS ใหม่ (stream==null แล้วก็ยังเช็ค _gpsWatchId แทน)
     if(_gpsWatchId === null) startGPS();
-    // เริ่มกล้องใหม่ — เดิมไม่ได้ restart กล้อง
-    // ทำให้กลับมาแล้วเห็นแค่หน้าจอดำ จนกว่าจะ reload
-    startCam(facing);
+    // restart กล้องเฉพาะตอนอยู่หน้า cam และยังไม่มี stream
+    if(!stream) startCam(facing);
   }
 });
 
